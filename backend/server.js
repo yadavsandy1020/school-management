@@ -62,8 +62,19 @@ app.use(helmet());
 // app.use('/api/', limiter);
 
 // CORS configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:3000'
+].filter(Boolean);
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || origin?.includes('vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
   credentials: true
 }));
 
@@ -72,7 +83,44 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadsPath = process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(uploadsPath));
+
+// Database connection (cached for serverless)
+let dbConnectPromise = null;
+const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) return;
+  if (dbConnectPromise) return dbConnectPromise;
+  dbConnectPromise = mongoose.connect(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+    maxPoolSize: 10,
+    minPoolSize: 1,
+    bufferTimeoutMS: 5000,
+  }).then(conn => {
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+  }).catch(error => {
+    dbConnectPromise = null;
+    console.error(`Error: ${error.message}`);
+    if (require.main === module) process.exit(1);
+  });
+  return dbConnectPromise;
+};
+
+// Eagerly connect on module load (for serverless cold starts)
+connectDB();
+
+// Ensure DB connection before handling requests (serverless-safe)
+app.use(async (req, res, next) => {
+  try {
+    if (mongoose.connection.readyState < 1) {
+      await connectDB();
+    }
+    next();
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Database connection failed' });
+  }
+});
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -129,17 +177,6 @@ app.get('/api/health', (req, res) => {
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
-
-// Database connection
-const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-  } catch (error) {
-    console.error(`Error: ${error.message}`);
-    process.exit(1);
-  }
-};
 
 // Start server
 const PORT = process.env.PORT || 5001;
