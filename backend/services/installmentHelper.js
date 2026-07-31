@@ -159,65 +159,98 @@ async function generateInstallmentInvoices(student, feeStructure, ctx, options =
  */
 async function recalculateInstallmentsForTransport(student, transportAlloc, ctx) {
   const { tenantId, schoolId, academicSession } = ctx;
+  const mongoose = require('mongoose');
 
-  // Find all unpaid (pending or partial) installments for this student/session
-  const unpaidInvoices = await FeeInvoice.find({
-    tenantId,
-    schoolId,
-    studentId: student._id,
-    academicSession,
-    status: { $in: ['pending', 'partial', 'overdue'] }
-  }).sort({ installmentLabel: 1 });
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    // Find all unpaid (pending or partial) installments for this student/session
+    const unpaidInvoices = await FeeInvoice.find({
+      tenantId,
+      schoolId,
+      studentId: student._id,
+      academicSession,
+      status: { $in: ['pending', 'partial', 'overdue'] }
+    }).sort({ installmentLabel: 1 }).session(session);
 
-  if (unpaidInvoices.length === 0) return [];
+    if (unpaidInvoices.length === 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return [];
+    }
 
-  const transportAmount = Number(transportAlloc.fare || 0);
-  if (transportAmount <= 0) return unpaidInvoices;
+    const transportAmount = Number(transportAlloc.fare || 0);
+    if (transportAmount <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return unpaidInvoices;
+    }
 
-  // Split transport fee equally across unpaid installments
-  const count = unpaidInvoices.length;
-  const baseShare = Math.floor(transportAmount / count);
-  const lastShare = transportAmount - baseShare * (count - 1);
-  const transportLabel = transportAlloc.routeId
-    ? `Transport (${transportAlloc.routeId.name || transportAlloc.routeId.routeNumber || ''})`
-    : 'Transport Fee';
+    // Only split across invoices that don't already have a transport item
+    const invoicesNeedingTransport = unpaidInvoices.filter(
+      inv => !inv.items.some(item => item.type === 'transport')
+    );
 
-  const updated = [];
+    if (invoicesNeedingTransport.length === 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return unpaidInvoices;
+    }
 
-  for (let i = 0; i < unpaidInvoices.length; i++) {
-    const inv = unpaidInvoices[i];
-    const shareAmount = i < count - 1 ? baseShare : lastShare;
+    const count = invoicesNeedingTransport.length;
+    const baseShare = Math.floor(transportAmount / count);
+    const lastShare = transportAmount - baseShare * (count - 1);
+    const transportLabel = transportAlloc.routeId
+      ? `Transport (${transportAlloc.routeId.name || transportAlloc.routeId.routeNumber || ''})`
+      : 'Transport Fee';
 
-    // Check if transport item already exists (avoid duplicates)
-    const hasTransport = inv.items.some(item => item.type === 'transport');
-    if (hasTransport) {
+    // Determine discount rate from existing invoice to apply to transport fee
+    // (matches generateInstallmentInvoices where discount covers transport)
+    const updated = [];
+
+    for (let i = 0; i < invoicesNeedingTransport.length; i++) {
+      const inv = invoicesNeedingTransport[i];
+      const rawShare = i < count - 1 ? baseShare : lastShare;
+
+      // Apply proportional discount to transport fee
+      // Original discount was computed against subtotal (without transport).
+      // We compute the effective discount rate and apply it to the transport share.
+      const oldSubtotal = inv.subtotal || 0;
+      const oldDiscount = inv.discount?.amount || 0;
+      const discountRate = oldSubtotal > 0 ? oldDiscount / oldSubtotal : 0;
+      const discountedShare = Math.round(rawShare * (1 - discountRate));
+
+      // Increase discount amount proportionally
+      const transportDiscount = rawShare - discountedShare;
+      if (inv.discount) {
+        inv.discount.amount = (inv.discount.amount || 0) + transportDiscount;
+      }
+
+      // Add transport fee item (post-discount amount)
+      inv.items.push({
+        type: 'transport',
+        name: transportLabel,
+        amount: discountedShare,
+        dueDate: undefined
+      });
+
+      // Recalculate subtotal, total, balance (totalAmount = subtotal - discount, no lateFee)
+      inv.subtotal = inv.items.reduce((s, item) => s + item.amount, 0);
+      inv.totalAmount = inv.subtotal - (inv.discount?.amount || 0);
+      inv.balanceAmount = inv.totalAmount - inv.paidAmount;
+
+      await inv.save({ session });
       updated.push(inv);
-      continue;
     }
 
-    // Add transport fee item
-    inv.items.push({
-      type: 'transport',
-      name: transportLabel,
-      amount: shareAmount,
-      dueDate: undefined
-    });
-
-    // Recalculate subtotal, total, balance
-    inv.subtotal = inv.items.reduce((s, item) => s + item.amount, 0);
-    inv.totalAmount = inv.subtotal - (inv.discount?.amount || 0) + (inv.lateFee || 0);
-    inv.balanceAmount = inv.totalAmount - inv.paidAmount;
-
-    // Update status if now fully paid (edge case: was partial and transport made it... still partial)
-    if (inv.balanceAmount <= 0) {
-      inv.status = 'paid';
-    }
-
-    await inv.save();
-    updated.push(inv);
+    await session.commitTransaction();
+    session.endSession();
+    return updated;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
   }
-
-  return updated;
 }
 
 module.exports = { generateInstallmentInvoices, recalculateInstallmentsForTransport };

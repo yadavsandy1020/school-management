@@ -3,7 +3,6 @@ const Driver = require('../models/Driver');
 const Route = require('../models/Route');
 const TransportAllocation = require('../models/TransportAllocation');
 const Student = require('../models/Student');
-const FeeStructure = require('../models/FeeStructure');
 const { getNextNumber } = require('../services/sequenceService');
 const { recalculateInstallmentsForTransport } = require('../services/installmentHelper');
 
@@ -213,20 +212,12 @@ exports.createAllocation = async (req, res) => {
     // Recalculate unpaid installments to include transport fee
     try {
       const student = await Student.findById(studentId);
-      if (student) {
-        const feeStructure = await FeeStructure.findOne({
-          ...tenantFilter(req),
-          classId: student.classId,
-          academicSession: student.academicSession
-        });
-        const academicSession = student.academicSession || (feeStructure && feeStructure.academicSession);
-        if (academicSession) {
-          await recalculateInstallmentsForTransport(
-            student,
-            populated,
-            { tenantId: req.user.tenantId, schoolId: req.user.schoolId, academicSession }
-          );
-        }
+      if (student && student.academicSession) {
+        await recalculateInstallmentsForTransport(
+          student,
+          populated,
+          { tenantId: req.user.tenantId, schoolId: req.user.schoolId, academicSession: student.academicSession }
+        );
       }
     } catch (recalcError) {
       console.error('Failed to recalculate installments for transport:', recalcError.message);
