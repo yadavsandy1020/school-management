@@ -141,13 +141,13 @@ const ClassForm = () => {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit Class' : 'Add New Class'}</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{isEdit ? 'Edit Class' : 'Add New Class'}</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="card space-y-6">
         <div>
           <label className="label">Class Name *</label>
-          <input type="text" name="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="input" required />
+          <input type="text" name="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="field" required />
         </div>
 
         <div>
@@ -163,37 +163,37 @@ const ClassForm = () => {
           <button type="button" onClick={addSection} className="text-sm text-primary-600 hover:underline">+ Add Section</button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="label">Room Number</label>
-            <input type="text" name="roomNumber" value={formData.roomNumber} onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })} className="input" />
+            <input type="text" name="roomNumber" value={formData.roomNumber} onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })} className="field" />
           </div>
           <div>
             <label className="label">Capacity</label>
-            <input type="number" name="capacity" value={formData.capacity} onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })} className="input" />
+            <input type="number" name="capacity" value={formData.capacity} onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })} className="field" />
           </div>
         </div>
 
         {/* Fee Structure Section */}
-        <div className="border-t pt-4">
+        <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Fee Structure</h3>
-              <p className="text-sm text-gray-500">Define fee items for this class</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Fee Structure</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Define fee items for this class</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-500">Total</p>
-              <p className="text-lg font-bold text-gray-900">₹{totalFees.toLocaleString()}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Total</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white">₹{totalFees.toLocaleString()}</p>
             </div>
           </div>
 
           <div className="space-y-3">
             {formData.fees.map((fee, index) => (
-              <div key={index} className="grid grid-cols-12 gap-2 items-center">
+              <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-center">
                 <select
                   value={fee.type}
                   onChange={(e) => updateFeeItem(index, 'type', e.target.value)}
-                  className="input col-span-3"
+                  className="field sm:col-span-3"
                 >
                   {FEE_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>{t.label}</option>
@@ -204,19 +204,19 @@ const ClassForm = () => {
                   placeholder="Fee name"
                   value={fee.name}
                   onChange={(e) => updateFeeItem(index, 'name', e.target.value)}
-                  className="input col-span-4"
+                  className="field sm:col-span-4"
                 />
                 <input
                   type="number"
                   placeholder="Amount"
                   value={fee.amount}
                   onChange={(e) => updateFeeItem(index, 'amount', parseFloat(e.target.value) || 0)}
-                  className="input col-span-3"
+                  className="field sm:col-span-3"
                 />
                 <button
                   type="button"
                   onClick={() => removeFeeItem(index)}
-                  className="col-span-2 flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                  className="flex items-center justify-center p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg sm:col-span-2"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -233,48 +233,48 @@ const ClassForm = () => {
         </div>
 
         {/* Installment Schedule Section */}
-        <div className="border-t pt-4">
+        <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Installment Schedule</h3>
-              <p className="text-sm text-gray-500">Split total fee into installments. First installment at admission, last by January 1st week.</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Installment Schedule</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Split total fee into installments. First installment at admission, last by January 1st week.</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-500">Total %</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Total %</p>
               <p className={`text-lg font-bold ${totalPercentage === 100 ? 'text-green-600' : 'text-red-600'}`}>{totalPercentage}%</p>
             </div>
           </div>
 
           <div className="space-y-3">
             {formData.installments.map((inst, index) => (
-              <div key={index} className="grid grid-cols-12 gap-2 items-center">
+              <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-center">
                 <input
                   type="text"
                   placeholder="Installment label (e.g. 1st Installment)"
                   value={inst.label}
                   onChange={(e) => updateInstallment(index, 'label', e.target.value)}
-                  className="input col-span-5"
+                  className="field sm:col-span-5"
                 />
                 <input
                   type="date"
                   value={inst.dueDate}
                   onChange={(e) => updateInstallment(index, 'dueDate', e.target.value)}
-                  className="input col-span-3"
+                  className="field sm:col-span-3"
                 />
-                <div className="col-span-2 relative">
+                <div className="relative sm:col-span-2">
                   <input
                     type="number"
                     placeholder="%"
                     value={inst.percentage}
                     onChange={(e) => updateInstallment(index, 'percentage', parseFloat(e.target.value) || 0)}
-                    className="input pr-6"
+                    className="field pr-6"
                   />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => removeInstallment(index)}
-                  className="col-span-2 flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                  className="flex items-center justify-center p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg sm:col-span-2"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

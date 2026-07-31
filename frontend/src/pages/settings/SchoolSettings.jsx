@@ -407,7 +407,7 @@ const SchoolSettings = () => {
       {activeTab === 'preview' && (
         <div className="card space-y-4">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Preview Document</h3>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <select value={previewType} onChange={(e) => setPreviewType(e.target.value)} className="field">
               {documentTypes.map((t) => <option key={t} value={t}>{t.replace(/([A-Z])/g, ' $1').trim()}</option>)}
             </select>

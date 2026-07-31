@@ -73,12 +73,12 @@ const InvoiceList = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Finance" title="Fee Invoices" description="View and manage all fee invoices" actions={<><Link to="/fees/structure" className="btn btn-secondary">Fee Structures</Link><Link to="/fees/invoices/new" className="btn btn-primary gap-2"><Plus className="h-4 w-4" />Create Invoice</Link></>} />
+      <PageHeader eyebrow="Finance" title="Fee Invoices" description="View and manage all fee invoices" actions={<><Link to="/fees/structure" className="btn btn-secondary whitespace-nowrap">Fee Structures</Link><Link to="/fees/invoices/new" className="btn btn-primary gap-2 whitespace-nowrap"><Plus className="h-4 w-4" />Create Invoice</Link></>} />
 
-      <div className="flex rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
-        <button onClick={() => setTab('invoices')} className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'invoices' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'}`}>All Invoices</button>
-        <button onClick={() => setTab('defaulters')} className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'defaulters' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'}`}>Fee Defaulters</button>
-        <button onClick={() => setTab('quarterly')} className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'quarterly' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'}`}>Quarterly Generation</button>
+      <div className="flex overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
+        <button onClick={() => setTab('invoices')} className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'invoices' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'}`}>All Invoices</button>
+        <button onClick={() => setTab('defaulters')} className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'defaulters' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'}`}>Fee Defaulters</button>
+        <button onClick={() => setTab('quarterly')} className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'quarterly' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'}`}>Quarterly Generation</button>
       </div>
 
       {tab === 'invoices' && (

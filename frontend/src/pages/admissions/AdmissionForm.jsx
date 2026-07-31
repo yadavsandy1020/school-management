@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 const Field = ({ label, name, type = 'text', required, children, formData, onChange, ...props }) => (
   <div>
     <label className="label">{label}{required && ' *'}</label>
-    {children || <input type={type} value={name.split('.').reduce((o, k) => o?.[k], formData) || ''} onChange={onChange(name)} className="input" required={required} {...props} />}
+    {children || <input type={type} value={name.split('.').reduce((o, k) => o?.[k], formData) || ''} onChange={onChange(name)} className="field" required={required} {...props} />}
   </div>
 )
 
@@ -133,22 +133,22 @@ const AdmissionForm = () => {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit Admission' : 'New Admission Application'}</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{isEdit ? 'Edit Admission' : 'New Admission Application'}</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="card space-y-8">
         {/* Academic & Class */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Academic Information</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Academic Information</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field formData={formData} onChange={handleChange} label="Class Applied" name="classApplied" required>
-              <select value={formData.classApplied} onChange={handleChange('classApplied')} className="input" required>
+              <select value={formData.classApplied} onChange={handleChange('classApplied')} className="field" required>
                 <option value="">Select a class</option>
                 {classes.map((classItem) => <option key={classItem._id} value={classItem._id}>{classItem.name}</option>)}
               </select>
             </Field>
             <Field formData={formData} onChange={handleChange} label="Section" name="section" required>
-              <select value={formData.section} onChange={handleChange('section')} className="input" required>
+              <select value={formData.section} onChange={handleChange('section')} className="field" required>
                 {sections.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </Field>
@@ -157,13 +157,13 @@ const AdmissionForm = () => {
 
         {/* Personal Information */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Personal Information</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field formData={formData} onChange={handleChange} label="First Name" name="studentInfo.firstName" required />
             <Field formData={formData} onChange={handleChange} label="Last Name" name="studentInfo.lastName" required />
             <Field formData={formData} onChange={handleChange} label="Date of Birth" name="studentInfo.dateOfBirth" type="date" required />
             <Field formData={formData} onChange={handleChange} label="Gender" name="studentInfo.gender" required>
-              <select value={formData.studentInfo.gender} onChange={handleChange('studentInfo.gender')} className="input" required>
+              <select value={formData.studentInfo.gender} onChange={handleChange('studentInfo.gender')} className="field" required>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
                 <option value="other">Other</option>
@@ -179,7 +179,7 @@ const AdmissionForm = () => {
 
         {/* Contact Information */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Contact Information</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field formData={formData} onChange={handleChange} label="Phone" name="contactInfo.phone" type="tel" required />
             <Field formData={formData} onChange={handleChange} label="Email" name="contactInfo.email" type="email" />
@@ -194,7 +194,7 @@ const AdmissionForm = () => {
 
         {/* Parent Information */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Parent Information</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Parent Information</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field formData={formData} onChange={handleChange} label="Father's Name" name="parentInfo.fatherName" required />
             <Field formData={formData} onChange={handleChange} label="Father's Phone" name="parentInfo.fatherPhone" type="tel" required />
@@ -209,7 +209,7 @@ const AdmissionForm = () => {
 
         {/* Previous Education */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Previous Education</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Previous Education</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field formData={formData} onChange={handleChange} label="Last School" name="previousEducation.lastSchool" />
             <Field formData={formData} onChange={handleChange} label="Last Class" name="previousEducation.lastClass" />
@@ -219,12 +219,12 @@ const AdmissionForm = () => {
 
         {/* Fee Discount */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Fee Discount (Optional)</h3>
-          <p className="text-sm text-gray-500 mb-4">Apply a per-student discount on fee invoices. Leave amount as 0 for no discount.</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Fee Discount (Optional)</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Apply a per-student discount on fee invoices. Leave amount as 0 for no discount.</p>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
               <label className="label">Discount Type</label>
-              <select value={formData.feeDiscount.type} onChange={handleChange('feeDiscount.type')} className="input">
+              <select value={formData.feeDiscount.type} onChange={handleChange('feeDiscount.type')} className="field">
                 <option value="fixed">Fixed Amount (₹)</option>
                 <option value="percentage">Percentage (%)</option>
               </select>
@@ -236,7 +236,7 @@ const AdmissionForm = () => {
                 min="0"
                 value={formData.feeDiscount.amount}
                 onChange={handleChange('feeDiscount.amount')}
-                className="input"
+                className="field"
                 placeholder="0"
               />
             </div>
@@ -246,7 +246,7 @@ const AdmissionForm = () => {
                 type="text"
                 value={formData.feeDiscount.reason}
                 onChange={handleChange('feeDiscount.reason')}
-                className="input"
+                className="field"
                 placeholder="e.g. Sibling concession, scholarship"
               />
             </div>

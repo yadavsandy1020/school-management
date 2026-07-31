@@ -118,10 +118,10 @@ const StudentForm = () => {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
           {isEdit ? 'Edit Student' : 'Add New Student'}
         </h1>
-        <p className="text-gray-600 mt-1">
+        <p className="text-slate-500 dark:text-slate-400 mt-1">
           {isEdit ? 'Update student information' : 'Fill in the student details'}
         </p>
       </div>
@@ -129,7 +129,7 @@ const StudentForm = () => {
       <form onSubmit={handleSubmit} className="card space-y-8">
         {/* Academic Information */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Academic Information</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Academic Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">Admission Number *</label>
@@ -138,7 +138,7 @@ const StudentForm = () => {
                 name="admissionNo"
                 value={formData.admissionNo}
                 onChange={handleChange}
-                className="input"
+                className="field"
                 required
               />
             </div>
@@ -149,7 +149,7 @@ const StudentForm = () => {
                 name="rollNo"
                 value={formData.rollNo}
                 onChange={handleChange}
-                className="input"
+                className="field"
               />
             </div>
             <div>
@@ -158,7 +158,7 @@ const StudentForm = () => {
                 name="classId"
                 value={formData.classId}
                 onChange={handleChange}
-                className="input"
+                className="field"
                 required
               >
                 <option value="">Select Class</option>
@@ -175,7 +175,7 @@ const StudentForm = () => {
                 name="section"
                 value={formData.section}
                 onChange={handleChange}
-                className="input"
+                className="field"
                 required
               >
                 <option value="A">A</option>
@@ -188,7 +188,7 @@ const StudentForm = () => {
 
         {/* Personal Information */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Personal Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">First Name *</label>
@@ -197,7 +197,7 @@ const StudentForm = () => {
                 name="personalInfo.firstName"
                 value={formData.personalInfo.firstName}
                 onChange={handleChange}
-                className="input"
+                className="field"
                 required
               />
             </div>
@@ -208,7 +208,7 @@ const StudentForm = () => {
                 name="personalInfo.lastName"
                 value={formData.personalInfo.lastName}
                 onChange={handleChange}
-                className="input"
+                className="field"
                 required
               />
             </div>
@@ -219,7 +219,7 @@ const StudentForm = () => {
                 name="personalInfo.dateOfBirth"
                 value={formData.personalInfo.dateOfBirth}
                 onChange={handleChange}
-                className="input"
+                className="field"
                 required
               />
             </div>
@@ -229,7 +229,7 @@ const StudentForm = () => {
                 name="personalInfo.gender"
                 value={formData.personalInfo.gender}
                 onChange={handleChange}
-                className="input"
+                className="field"
                 required
               >
                 <option value="male">Male</option>
@@ -244,7 +244,7 @@ const StudentForm = () => {
                 name="personalInfo.bloodGroup"
                 value={formData.personalInfo.bloodGroup}
                 onChange={handleChange}
-                className="input"
+                className="field"
               />
             </div>
           </div>
@@ -252,7 +252,7 @@ const StudentForm = () => {
 
         {/* Contact Information */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Contact Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <label className="label">Street Address</label>
@@ -261,7 +261,7 @@ const StudentForm = () => {
                 name="contactInfo.address.street"
                 value={formData.contactInfo.address.street}
                 onChange={handleChange}
-                className="input"
+                className="field"
               />
             </div>
             <div>
@@ -271,7 +271,7 @@ const StudentForm = () => {
                 name="contactInfo.address.city"
                 value={formData.contactInfo.address.city}
                 onChange={handleChange}
-                className="input"
+                className="field"
               />
             </div>
             <div>
@@ -281,7 +281,7 @@ const StudentForm = () => {
                 name="contactInfo.address.state"
                 value={formData.contactInfo.address.state}
                 onChange={handleChange}
-                className="input"
+                className="field"
               />
             </div>
             <div>
@@ -291,7 +291,7 @@ const StudentForm = () => {
                 name="contactInfo.address.pincode"
                 value={formData.contactInfo.address.pincode}
                 onChange={handleChange}
-                className="input"
+                className="field"
               />
             </div>
             <div>
@@ -301,7 +301,7 @@ const StudentForm = () => {
                 name="contactInfo.phone"
                 value={formData.contactInfo.phone}
                 onChange={handleChange}
-                className="input"
+                className="field"
                 required
               />
             </div>
@@ -312,7 +312,7 @@ const StudentForm = () => {
                 name="contactInfo.email"
                 value={formData.contactInfo.email}
                 onChange={handleChange}
-                className="input"
+                className="field"
               />
             </div>
           </div>
@@ -320,7 +320,7 @@ const StudentForm = () => {
 
         {/* Parent Information */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Parent Information</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Parent Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">Father's Name *</label>
@@ -329,7 +329,7 @@ const StudentForm = () => {
                 name="parentInfo.fatherName"
                 value={formData.parentInfo.fatherName}
                 onChange={handleChange}
-                className="input"
+                className="field"
                 required
               />
             </div>
@@ -340,7 +340,7 @@ const StudentForm = () => {
                 name="parentInfo.fatherPhone"
                 value={formData.parentInfo.fatherPhone}
                 onChange={handleChange}
-                className="input"
+                className="field"
                 required
               />
             </div>
@@ -351,7 +351,7 @@ const StudentForm = () => {
                 name="parentInfo.fatherOccupation"
                 value={formData.parentInfo.fatherOccupation}
                 onChange={handleChange}
-                className="input"
+                className="field"
               />
             </div>
             <div>
@@ -361,7 +361,7 @@ const StudentForm = () => {
                 name="parentInfo.fatherEmail"
                 value={formData.parentInfo.fatherEmail}
                 onChange={handleChange}
-                className="input"
+                className="field"
               />
             </div>
             <div>
@@ -371,7 +371,7 @@ const StudentForm = () => {
                 name="parentInfo.motherName"
                 value={formData.parentInfo.motherName}
                 onChange={handleChange}
-                className="input"
+                className="field"
               />
             </div>
             <div>
@@ -381,7 +381,7 @@ const StudentForm = () => {
                 name="parentInfo.motherPhone"
                 value={formData.parentInfo.motherPhone}
                 onChange={handleChange}
-                className="input"
+                className="field"
               />
             </div>
           </div>

@@ -246,9 +246,9 @@ const StudentDetail = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link to="/students" className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white"><ArrowLeft className="h-4 w-4" />Back to Students</Link>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button className="btn btn-secondary gap-2"><Printer className="h-4 w-4" />Print ID Card</button>
           <Link to={`/students/${id}/edit`} className="btn btn-primary gap-2"><Pencil className="h-4 w-4" />Edit</Link>
         </div>
@@ -269,9 +269,9 @@ const StudentDetail = () => {
         </div>
       </div>
 
-      <div className="flex gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+      <div className="flex gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
         {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>{tab.label}</button>
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium transition ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>{tab.label}</button>
         ))}
       </div>
 
@@ -469,7 +469,7 @@ const StudentDetail = () => {
 
       {activeTab === 'fees' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="card p-4 text-center">
               <p className="text-2xl font-bold text-emerald-600">₹{feeSummary.total.toLocaleString()}</p>
               <p className="text-xs text-slate-500">Total Billed</p>

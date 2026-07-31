@@ -120,9 +120,9 @@ const StudentList = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search by name, admission no..."
           filters={
-            <div className="flex gap-2">
-              <SelectField value={feeQuarter} onChange={(e) => { setPage(1); setFeeQuarter(e.target.value) }} options={quarterOptions} placeholder="Fee Filter" className="w-44" />
-              <SelectField value={filterClass} onChange={(e) => { setPage(1); setFilterClass(e.target.value) }} options={classOptions} placeholder="All Classes" className="w-36" />
+            <div className="flex flex-wrap gap-2">
+              <SelectField value={feeQuarter} onChange={(e) => { setPage(1); setFeeQuarter(e.target.value) }} options={quarterOptions} placeholder="Fee Filter" className="w-full sm:w-44" />
+              <SelectField value={filterClass} onChange={(e) => { setPage(1); setFilterClass(e.target.value) }} options={classOptions} placeholder="All Classes" className="w-full sm:w-36" />
             </div>
           }
           exportAction={<button onClick={exportCSV} className="icon-button" aria-label="Export CSV"><Download className="h-4 w-4" /></button>}

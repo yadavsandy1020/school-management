@@ -93,50 +93,50 @@ const TeacherForm = () => {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit Teacher' : 'Add New Teacher'}</h1>
-        <p className="text-gray-600 mt-1">Fill in the teacher details</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{isEdit ? 'Edit Teacher' : 'Add New Teacher'}</h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">Fill in the teacher details</p>
       </div>
 
       <form onSubmit={handleSubmit} className="card space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="label">Employee ID *</label>
-            <input type="text" name="employeeId" value={formData.employeeId} onChange={handleChange} className="input" required />
+            <input type="text" name="employeeId" value={formData.employeeId} onChange={handleChange} className="field" required />
           </div>
           <div>
             <label className="label">Designation *</label>
-            <input type="text" name="employmentDetails.designation" value={formData.employmentDetails.designation} onChange={handleChange} className="input" required />
+            <input type="text" name="employmentDetails.designation" value={formData.employmentDetails.designation} onChange={handleChange} className="field" required />
           </div>
           <div>
             <label className="label">First Name *</label>
-            <input type="text" name="personalInfo.firstName" value={formData.personalInfo.firstName} onChange={handleChange} className="input" required />
+            <input type="text" name="personalInfo.firstName" value={formData.personalInfo.firstName} onChange={handleChange} className="field" required />
           </div>
           <div>
             <label className="label">Last Name *</label>
-            <input type="text" name="personalInfo.lastName" value={formData.personalInfo.lastName} onChange={handleChange} className="input" required />
+            <input type="text" name="personalInfo.lastName" value={formData.personalInfo.lastName} onChange={handleChange} className="field" required />
           </div>
           <div>
             <label className="label">Phone *</label>
-            <input type="tel" name="contactInfo.phone" value={formData.contactInfo.phone} onChange={handleChange} className="input" required />
+            <input type="tel" name="contactInfo.phone" value={formData.contactInfo.phone} onChange={handleChange} className="field" required />
           </div>
           <div>
             <label className="label">Email *</label>
-            <input type="email" name="contactInfo.email" value={formData.contactInfo.email} onChange={handleChange} className="input" required />
+            <input type="email" name="contactInfo.email" value={formData.contactInfo.email} onChange={handleChange} className="field" required />
           </div>
           <div>
             <label className="label">Join Date *</label>
-            <input type="date" name="employmentDetails.joinDate" value={formData.employmentDetails.joinDate} onChange={handleChange} className="input" required />
+            <input type="date" name="employmentDetails.joinDate" value={formData.employmentDetails.joinDate} onChange={handleChange} className="field" required />
           </div>
         </div>
 
         <div className="card p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Salary Configuration</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Salary Configuration</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div><label className="label">Basic Salary (₹)</label><input type="number" name="salaryDetails.basicSalary" value={formData.salaryDetails?.basicSalary || ''} onChange={handleChange} className="input" /></div>
-            <div><label className="label">DA (₹)</label><input type="number" name="salaryDetails.allowances.da" value={formData.salaryDetails?.allowances?.da || ''} onChange={handleChange} className="input" /></div>
-            <div><label className="label">HRA (₹)</label><input type="number" name="salaryDetails.allowances.hra" value={formData.salaryDetails?.allowances?.hra || ''} onChange={handleChange} className="input" /></div>
-            <div><label className="label">TA (₹)</label><input type="number" name="salaryDetails.allowances.ta" value={formData.salaryDetails?.allowances?.ta || ''} onChange={handleChange} className="input" /></div>
-            <div><label className="label">Others (₹)</label><input type="number" name="salaryDetails.allowances.others" value={formData.salaryDetails?.allowances?.others || ''} onChange={handleChange} className="input" /></div>
+            <div><label className="label">Basic Salary (₹)</label><input type="number" name="salaryDetails.basicSalary" value={formData.salaryDetails?.basicSalary || ''} onChange={handleChange} className="field" /></div>
+            <div><label className="label">DA (₹)</label><input type="number" name="salaryDetails.allowances.da" value={formData.salaryDetails?.allowances?.da || ''} onChange={handleChange} className="field" /></div>
+            <div><label className="label">HRA (₹)</label><input type="number" name="salaryDetails.allowances.hra" value={formData.salaryDetails?.allowances?.hra || ''} onChange={handleChange} className="field" /></div>
+            <div><label className="label">TA (₹)</label><input type="number" name="salaryDetails.allowances.ta" value={formData.salaryDetails?.allowances?.ta || ''} onChange={handleChange} className="field" /></div>
+            <div><label className="label">Others (₹)</label><input type="number" name="salaryDetails.allowances.others" value={formData.salaryDetails?.allowances?.others || ''} onChange={handleChange} className="field" /></div>
             <div className="flex items-end">
               <div className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-xl">
                 <p className="text-xs text-slate-500 uppercase">Calculated Total</p>

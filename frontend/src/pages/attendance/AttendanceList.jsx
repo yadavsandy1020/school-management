@@ -73,8 +73,8 @@ const AttendanceList = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
-          <p className="text-gray-600 mt-1">View and manage attendance records</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Attendance</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">View and manage attendance records</p>
         </div>
         {canMark && tab === 'class' && (
           <Link to="/attendance/mark" className="btn btn-primary inline-flex items-center">
@@ -105,7 +105,7 @@ const AttendanceList = () => {
       {tab === 'self' && isTeacher && (
         <>
           <div className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Mark Today's Attendance</h3>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Mark Today's Attendance</h3>
             <form onSubmit={handleMarkSelf} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               <div>
                 <label className="label">Date</label>
@@ -131,38 +131,38 @@ const AttendanceList = () => {
           {teacherStats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="card p-4 text-center">
-                <p className="text-2xl font-bold text-gray-900">{teacherStats.totalDays}</p>
-                <p className="text-sm text-gray-600">Total Marked</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{teacherStats.totalDays}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Total Marked</p>
               </div>
               <div className="card p-4 text-center">
                 <p className="text-2xl font-bold text-green-600">{teacherStats.presentDays}</p>
-                <p className="text-sm text-gray-600">Present</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Present</p>
               </div>
               <div className="card p-4 text-center">
                 <p className="text-2xl font-bold text-red-600">{teacherStats.absentDays}</p>
-                <p className="text-sm text-gray-600">Absent</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Absent</p>
               </div>
               <div className="card p-4 text-center">
                 <p className="text-2xl font-bold text-indigo-600">{teacherStats.percentage}%</p>
-                <p className="text-sm text-gray-600">Attendance Rate</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Attendance Rate</p>
               </div>
             </div>
           )}
 
           <div className="card overflow-x-auto">
-            <h3 className="text-lg font-semibold text-gray-900 p-4">Attendance History</h3>
-            <table className="w-full">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white p-4">Attendance History</h3>
+            <table className="data-table">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Remarks</th>
+                <tr>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Remarks</th>
                 </tr>
               </thead>
               <tbody>
                 {teacherAttendance.length > 0 ? (
                   teacherAttendance.map((rec) => (
-                    <tr key={rec._id} className="border-b hover:bg-gray-50">
+                    <tr key={rec._id}>
                       <td className="py-3 px-4">{new Date(rec.date).toLocaleDateString()}</td>
                       <td className="py-3 px-4">
                         <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
@@ -177,11 +177,11 @@ const AttendanceList = () => {
                           {rec.status.replace('_', ' ')}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{rec.remarks || '-'}</td>
+                      <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">{rec.remarks || '-'}</td>
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan="3" className="py-8 text-center text-gray-500">No attendance records found</td></tr>
+                  <tr><td colSpan="3" className="py-8 text-center text-slate-500 dark:text-slate-400">No attendance records found</td></tr>
                 )}
               </tbody>
             </table>
@@ -191,20 +191,20 @@ const AttendanceList = () => {
 
       {tab === 'class' && (
         <div className="card overflow-x-auto">
-          <table className="w-full">
+          <table className="data-table">
             <thead>
-              <tr className="border-b">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Class</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Section</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Present</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Absent</th>
+              <tr>
+                <th>Date</th>
+                <th>Class</th>
+                <th>Section</th>
+                <th>Present</th>
+                <th>Absent</th>
               </tr>
             </thead>
             <tbody>
               {Array.isArray(attendance) && attendance.length > 0 ? (
                 attendance.map((att) => (
-                  <tr key={att._id} className="border-b hover:bg-gray-50">
+                  <tr key={att._id}>
                     <td className="py-3 px-4">{new Date(att.date).toLocaleDateString()}</td>
                     <td className="py-3 px-4">{att.classId?.name || '-'}</td>
                     <td className="py-3 px-4">{att.section}</td>
@@ -213,7 +213,7 @@ const AttendanceList = () => {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="5" className="py-8 text-center text-gray-500">No attendance records found</td></tr>
+                <tr><td colSpan="5" className="py-8 text-center text-slate-500 dark:text-slate-400">No attendance records found</td></tr>
               )}
             </tbody>
           </table>

@@ -80,8 +80,8 @@ const MarkAttendance = () => {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Mark Attendance</h1>
-        <p className="text-gray-600 mt-1">Record daily attendance for a class</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Mark Attendance</h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">Record daily attendance for a class</p>
       </div>
 
       <form onSubmit={handleSubmit} className="card space-y-6">
@@ -110,18 +110,18 @@ const MarkAttendance = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-slate-50 dark:bg-slate-800/50">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Roll No</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Student Name</th>
-                  <th className="text-center py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-slate-300">Roll No</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-700 dark:text-slate-300">Student Name</th>
+                  <th className="text-center py-3 px-4 font-semibold text-slate-700 dark:text-slate-300">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {students.map((student, idx) => (
-                  <tr key={student.studentId} className="border-b hover:bg-gray-50 dark:hover:bg-slate-800/30">
+                  <tr key={student.studentId} className="border-b hover:bg-slate-50 dark:bg-slate-800/30">
                     <td className="py-3 px-4 text-sm">{student.rollNo}</td>
                     <td className="py-3 px-4 text-sm font-medium">{student.name}</td>
                     <td className="py-3 px-4">
-                      <div className="flex justify-center gap-2">
+                      <div className="flex flex-wrap justify-center gap-2">
                         {statusButtons.map(btn => (
                           <button
                             key={btn.value}
@@ -148,7 +148,7 @@ const MarkAttendance = () => {
         )}
 
         {formData.classId && students.length === 0 && (
-          <div className="p-4 bg-gray-50 rounded-lg text-center text-gray-500">
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg text-center text-slate-500 dark:text-slate-400">
             No students found for this class and section
           </div>
         )}
