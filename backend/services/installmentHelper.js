@@ -148,4 +148,76 @@ async function generateInstallmentInvoices(student, feeStructure, ctx, options =
   return invoices;
 }
 
-module.exports = { generateInstallmentInvoices };
+/**
+ * Recalculate unpaid installments when transport is opted in after initial invoice generation.
+ * Adds transport fee items to each unpaid installment and recalculates totals/balances.
+ *
+ * @param {Object} student      - Student document
+ * @param {Object} transportAlloc - TransportAllocation document (populated with routeId)
+ * @param {Object} ctx          - { tenantId, schoolId, academicSession }
+ * @returns {Promise<Array>}    - Updated unpaid invoices
+ */
+async function recalculateInstallmentsForTransport(student, transportAlloc, ctx) {
+  const { tenantId, schoolId, academicSession } = ctx;
+
+  // Find all unpaid (pending or partial) installments for this student/session
+  const unpaidInvoices = await FeeInvoice.find({
+    tenantId,
+    schoolId,
+    studentId: student._id,
+    academicSession,
+    status: { $in: ['pending', 'partial', 'overdue'] }
+  }).sort({ installmentLabel: 1 });
+
+  if (unpaidInvoices.length === 0) return [];
+
+  const transportAmount = Number(transportAlloc.fare || 0);
+  if (transportAmount <= 0) return unpaidInvoices;
+
+  // Split transport fee equally across unpaid installments
+  const count = unpaidInvoices.length;
+  const baseShare = Math.floor(transportAmount / count);
+  const lastShare = transportAmount - baseShare * (count - 1);
+  const transportLabel = transportAlloc.routeId
+    ? `Transport (${transportAlloc.routeId.name || transportAlloc.routeId.routeNumber || ''})`
+    : 'Transport Fee';
+
+  const updated = [];
+
+  for (let i = 0; i < unpaidInvoices.length; i++) {
+    const inv = unpaidInvoices[i];
+    const shareAmount = i < count - 1 ? baseShare : lastShare;
+
+    // Check if transport item already exists (avoid duplicates)
+    const hasTransport = inv.items.some(item => item.type === 'transport');
+    if (hasTransport) {
+      updated.push(inv);
+      continue;
+    }
+
+    // Add transport fee item
+    inv.items.push({
+      type: 'transport',
+      name: transportLabel,
+      amount: shareAmount,
+      dueDate: undefined
+    });
+
+    // Recalculate subtotal, total, balance
+    inv.subtotal = inv.items.reduce((s, item) => s + item.amount, 0);
+    inv.totalAmount = inv.subtotal - (inv.discount?.amount || 0) + (inv.lateFee || 0);
+    inv.balanceAmount = inv.totalAmount - inv.paidAmount;
+
+    // Update status if now fully paid (edge case: was partial and transport made it... still partial)
+    if (inv.balanceAmount <= 0) {
+      inv.status = 'paid';
+    }
+
+    await inv.save();
+    updated.push(inv);
+  }
+
+  return updated;
+}
+
+module.exports = { generateInstallmentInvoices, recalculateInstallmentsForTransport };

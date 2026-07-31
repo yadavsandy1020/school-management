@@ -22,7 +22,7 @@ const StudentList = () => {
   const [studentToDelete, setStudentToDelete] = useState(null)
 
   useEffect(() => { fetchClasses(); fetchSchoolConfig() }, [])
-  useEffect(() => { if (academicSession) fetchStudents() }, [page, searchTerm, filterClass, feeQuarter, academicSession])
+  useEffect(() => { fetchStudents() }, [page, searchTerm, filterClass, feeQuarter, academicSession])
 
   const fetchSchoolConfig = async () => {
     try {
@@ -48,7 +48,8 @@ const StudentList = () => {
     setError(null)
     try {
       if (feeQuarter) {
-        const params = new URLSearchParams({ quarter: feeQuarter, academicSession })
+        const params = new URLSearchParams({ quarter: feeQuarter })
+        if (academicSession) params.append('academicSession', academicSession)
         if (filterClass) params.append('classId', filterClass)
         const response = await api.get(`/fees/defaulters?${params}`)
         setFeeDefaulters(response.data.data || [])

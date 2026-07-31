@@ -2,7 +2,10 @@ const Vehicle = require('../models/Vehicle');
 const Driver = require('../models/Driver');
 const Route = require('../models/Route');
 const TransportAllocation = require('../models/TransportAllocation');
+const Student = require('../models/Student');
+const FeeStructure = require('../models/FeeStructure');
 const { getNextNumber } = require('../services/sequenceService');
+const { recalculateInstallmentsForTransport } = require('../services/installmentHelper');
 
 const tenantFilter = (req) => ({
   tenantId: req.user.tenantId,
@@ -206,6 +209,28 @@ exports.createAllocation = async (req, res) => {
     const populated = await TransportAllocation.findById(allocation._id)
       .populate('studentId', 'admissionNo personalInfo.firstName personalInfo.lastName')
       .populate({ path: 'routeId', populate: { path: 'vehicleId', select: 'name registrationNo capacity' } });
+
+    // Recalculate unpaid installments to include transport fee
+    try {
+      const student = await Student.findById(studentId);
+      if (student) {
+        const feeStructure = await FeeStructure.findOne({
+          ...tenantFilter(req),
+          classId: student.classId,
+          academicSession: student.academicSession
+        });
+        const academicSession = student.academicSession || (feeStructure && feeStructure.academicSession);
+        if (academicSession) {
+          await recalculateInstallmentsForTransport(
+            student,
+            populated,
+            { tenantId: req.user.tenantId, schoolId: req.user.schoolId, academicSession }
+          );
+        }
+      }
+    } catch (recalcError) {
+      console.error('Failed to recalculate installments for transport:', recalcError.message);
+    }
 
     res.status(201).json({ success: true, data: populated });
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
