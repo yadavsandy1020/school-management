@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
+const { requireActiveLicense, requireWriteAccess } = require('../middleware/saas');
 const {
   createSchool,
   getAllSchools,
@@ -10,22 +11,27 @@ const {
   updateCustomization,
   updateSchoolStatus,
   deleteSchool,
-  getSchoolStats
+  getSchoolStats,
+  onboardSchool
 } = require('../controllers/schoolController');
 
 router.route('/')
   .post(protect, authorize('super_admin'), createSchool)
   .get(protect, authorize('super_admin'), getAllSchools);
 
+router.post('/onboard', protect, authorize('super_admin'), onboardSchool);
+
 router.get('/tenant/:tenantId', getSchoolByTenantId);
 
-router.route('/:id')
-  .get(protect, getSchool)
-  .put(protect, updateSchool)
-  .delete(protect, authorize('super_admin'), deleteSchool);
+router.use(protect, requireActiveLicense);
 
-router.put('/:id/customization', protect, updateCustomization);
-router.put('/:id/status', protect, authorize('super_admin'), updateSchoolStatus);
-router.get('/:id/stats', protect, getSchoolStats);
+router.route('/:id')
+  .get(getSchool)
+  .put(requireWriteAccess, updateSchool)
+  .delete(authorize('super_admin'), requireWriteAccess, deleteSchool);
+
+router.put('/:id/customization', requireWriteAccess, updateCustomization);
+router.put('/:id/status', authorize('super_admin'), requireWriteAccess, updateSchoolStatus);
+router.get('/:id/stats', authorize('school_admin', 'super_admin'), getSchoolStats);
 
 module.exports = router;

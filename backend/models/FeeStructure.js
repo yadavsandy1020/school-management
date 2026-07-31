@@ -48,6 +48,22 @@ const feeStructureSchema = new mongoose.Schema({
       default: 'one_time'
     }
   }],
+  installments: [{
+    label: {
+      type: String,
+      required: true
+    },
+    dueDate: {
+      type: Date,
+      required: true
+    },
+    percentage: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 100
+    }
+  }],
   totalAmount: {
     type: Number,
     required: true

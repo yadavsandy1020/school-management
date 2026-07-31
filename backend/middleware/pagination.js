@@ -16,8 +16,9 @@ const paginate = (req, res, next) => {
 // Build pagination response
 const buildPaginationResponse = (data, total, page, limit) => {
   const totalPages = Math.ceil(total / limit);
-  
+
   return {
+    success: true,
     data,
     pagination: {
       currentPage: page,

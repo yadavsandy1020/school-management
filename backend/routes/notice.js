@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 const { paginate } = require('../middleware/pagination');
+const { requireActiveLicense, requireFeature, requireWriteAccess } = require('../middleware/saas');
 const {
   createNotice,
   getNotices,
@@ -13,18 +14,19 @@ const {
 } = require('../controllers/noticeController');
 
 router.use(paginate);
+router.use(protect, requireActiveLicense, requireFeature('NOTICES'));
 
 router.route('/')
-  .post(protect, authorize('school_admin', 'teacher'), createNotice)
-  .get(protect, getNotices);
+  .post(authorize('school_admin', 'teacher'), requireWriteAccess, createNotice)
+  .get(getNotices);
 
-router.get('/my-notices', protect, getMyNotices);
+router.get('/my-notices', getMyNotices);
 
 router.route('/:id')
-  .get(protect, getNotice)
-  .put(protect, authorize('school_admin', 'teacher'), updateNotice)
-  .delete(protect, authorize('school_admin', 'teacher'), deleteNotice);
+  .get(getNotice)
+  .put(authorize('school_admin', 'teacher'), requireWriteAccess, updateNotice)
+  .delete(authorize('school_admin', 'teacher'), requireWriteAccess, deleteNotice);
 
-router.put('/:id/pin', protect, authorize('school_admin'), togglePinNotice);
+router.put('/:id/pin', authorize('school_admin'), requireWriteAccess, togglePinNotice);
 
 module.exports = router;

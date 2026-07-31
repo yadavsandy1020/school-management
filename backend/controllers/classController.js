@@ -1,6 +1,8 @@
 const Class = require('../models/Class');
 const Subject = require('../models/Subject');
 const Student = require('../models/Student');
+const FeeStructure = require('../models/FeeStructure');
+const AcademicSession = require('../models/AcademicSession');
 const { buildPaginationResponse } = require('../middleware/pagination');
 
 // @desc    Create class
@@ -8,7 +10,7 @@ const { buildPaginationResponse } = require('../middleware/pagination');
 // @access  Private (School Admin)
 exports.createClass = async (req, res) => {
   try {
-    const { name, sections, classTeacher, subjects, roomNumber, capacity } = req.body;
+    const { name, sections, classTeacher, subjects, roomNumber, capacity, fees, installments } = req.body;
 
     const classData = await Class.create({
       name,
@@ -20,6 +22,36 @@ exports.createClass = async (req, res) => {
       roomNumber,
       capacity
     });
+
+    // Create fee structure if fee items are provided
+    if (Array.isArray(fees) && fees.length > 0) {
+      const totalAmount = fees.reduce((sum, fee) => sum + Number(fee.amount || 0), 0);
+
+      // Determine current academic session
+      let academicSession = new Date().getFullYear().toString();
+      const currentSession = await AcademicSession.findOne({
+        tenantId: req.user.tenantId,
+        schoolId: req.user.schoolId,
+        isCurrent: true
+      });
+      if (currentSession) {
+        academicSession = currentSession.name;
+      }
+
+      const feeStructure = await FeeStructure.create({
+        name: `${name} Fee Structure`,
+        tenantId: req.user.tenantId,
+        schoolId: req.user.schoolId,
+        classId: classData._id,
+        academicSession,
+        fees,
+        installments: installments && installments.length > 0 ? installments : undefined,
+        totalAmount
+      });
+
+      classData.feeStructure = feeStructure._id;
+      await classData.save();
+    }
 
     res.status(201).json({
       success: true,
@@ -66,7 +98,7 @@ exports.getClasses = async (req, res) => {
 // @access  Private
 exports.getClass = async (req, res) => {
   try {
-    const classData = await Class.findById(req.params.id)
+    const classData = await Class.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId })
       .populate('classTeacher', 'name email phone')
       .populate('subjects', 'name code')
       .populate('feeStructure', 'name fees totalAmount');
@@ -92,6 +124,8 @@ exports.getClass = async (req, res) => {
       const count = await Student.countDocuments({
         classId: classData._id,
         section,
+        tenantId: req.user.tenantId,
+        schoolId: req.user.schoolId,
         isActive: true
       });
       studentCounts[section] = count;
@@ -115,7 +149,7 @@ exports.getClass = async (req, res) => {
 // @access  Private (School Admin)
 exports.updateClass = async (req, res) => {
   try {
-    let classData = await Class.findById(req.params.id);
+    let classData = await Class.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!classData) {
       return res.status(404).json({
@@ -132,13 +166,49 @@ exports.updateClass = async (req, res) => {
       });
     }
 
-    const { name, sections, classTeacher, subjects, roomNumber, capacity, feeStructure } = req.body;
+    const { name, sections, classTeacher, subjects, roomNumber, capacity, fees, installments } = req.body;
 
-    classData = await Class.findByIdAndUpdate(
-      req.params.id,
-      { name, sections, classTeacher, subjects, roomNumber, capacity, feeStructure },
+    classData = await Class.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId },
+      { name, sections, classTeacher, subjects, roomNumber, capacity },
       { new: true, runValidators: true }
     ).populate('classTeacher', 'name').populate('subjects', 'name code');
+
+    // Update or create fee structure if fees are provided
+    if (Array.isArray(fees) && fees.length > 0) {
+      const totalAmount = fees.reduce((sum, fee) => sum + Number(fee.amount || 0), 0);
+
+      let academicSession = new Date().getFullYear().toString();
+      const currentSession = await AcademicSession.findOne({
+        tenantId: req.user.tenantId,
+        schoolId: req.user.schoolId,
+        isCurrent: true
+      });
+      if (currentSession) {
+        academicSession = currentSession.name;
+      }
+
+      if (classData.feeStructure) {
+        await FeeStructure.findOneAndUpdate(
+          { _id: classData.feeStructure },
+          { fees, installments: installments && installments.length > 0 ? installments : undefined, totalAmount },
+          { new: true }
+        );
+      } else {
+        const feeStructure = await FeeStructure.create({
+          name: `${name} Fee Structure`,
+          tenantId: req.user.tenantId,
+          schoolId: req.user.schoolId,
+          classId: classData._id,
+          academicSession,
+          fees,
+          installments: installments && installments.length > 0 ? installments : undefined,
+          totalAmount
+        });
+        classData.feeStructure = feeStructure._id;
+        await classData.save();
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -158,7 +228,7 @@ exports.updateClass = async (req, res) => {
 // @access  Private (School Admin)
 exports.deleteClass = async (req, res) => {
   try {
-    const classData = await Class.findById(req.params.id);
+    const classData = await Class.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!classData) {
       return res.status(404).json({
@@ -176,7 +246,7 @@ exports.deleteClass = async (req, res) => {
     }
 
     // Check if class has students
-    const studentCount = await Student.countDocuments({ classId: classData._id, isActive: true });
+    const studentCount = await Student.countDocuments({ classId: classData._id, tenantId: req.user.tenantId, schoolId: req.user.schoolId, isActive: true });
     if (studentCount > 0) {
       return res.status(400).json({
         success: false,
@@ -184,7 +254,7 @@ exports.deleteClass = async (req, res) => {
       });
     }
 
-    await classData.remove();
+    await classData.deleteOne();
 
     res.status(200).json({
       success: true,
@@ -204,7 +274,7 @@ exports.deleteClass = async (req, res) => {
 // @access  Private (School Admin)
 exports.addSection = async (req, res) => {
   try {
-    const classData = await Class.findById(req.params.id);
+    const classData = await Class.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!classData) {
       return res.status(404).json({
@@ -213,7 +283,14 @@ exports.addSection = async (req, res) => {
       });
     }
 
+    if (classData.tenantId !== req.user.tenantId || classData.schoolId.toString() !== req.user.schoolId.toString()) {
+      return res.status(403).json({ success: false, error: 'Not authorized to update this class' });
+    }
+
     const { section } = req.body;
+    if (!section || !section.trim()) {
+      return res.status(400).json({ success: false, error: 'Section is required' });
+    }
 
     if (classData.sections.includes(section)) {
       return res.status(400).json({
@@ -243,7 +320,7 @@ exports.addSection = async (req, res) => {
 // @access  Private (School Admin)
 exports.removeSection = async (req, res) => {
   try {
-    const classData = await Class.findById(req.params.id);
+    const classData = await Class.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!classData) {
       return res.status(404).json({
@@ -252,10 +329,16 @@ exports.removeSection = async (req, res) => {
       });
     }
 
+    if (classData.tenantId !== req.user.tenantId || classData.schoolId.toString() !== req.user.schoolId.toString()) {
+      return res.status(403).json({ success: false, error: 'Not authorized to update this class' });
+    }
+
     // Check if section has students
     const studentCount = await Student.countDocuments({
       classId: classData._id,
       section: req.params.section,
+      tenantId: req.user.tenantId,
+      schoolId: req.user.schoolId,
       isActive: true
     });
 
@@ -287,7 +370,7 @@ exports.removeSection = async (req, res) => {
 // @access  Private (School Admin)
 exports.assignSubjects = async (req, res) => {
   try {
-    const classData = await Class.findById(req.params.id);
+    const classData = await Class.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!classData) {
       return res.status(404).json({
@@ -296,17 +379,24 @@ exports.assignSubjects = async (req, res) => {
       });
     }
 
+    if (classData.tenantId !== req.user.tenantId || classData.schoolId.toString() !== req.user.schoolId.toString()) {
+      return res.status(403).json({ success: false, error: 'Not authorized to update this class' });
+    }
+
     const { subjects } = req.body;
+    if (!Array.isArray(subjects)) {
+      return res.status(400).json({ success: false, error: 'Subjects must be an array' });
+    }
     classData.subjects = subjects;
     await classData.save();
 
     // Update subjects to include this class
     await Subject.updateMany(
-      { _id: { $in: subjects } },
+      { _id: { $in: subjects }, tenantId: req.user.tenantId, schoolId: req.user.schoolId },
       { $addToSet: { classes: classData._id } }
     );
 
-    const updatedClass = await Class.findById(classData._id).populate('subjects', 'name code');
+    const updatedClass = await Class.findOne({ _id: classData._id, tenantId: req.user.tenantId, schoolId: req.user.schoolId }).populate('subjects', 'name code');
 
     res.status(200).json({
       success: true,

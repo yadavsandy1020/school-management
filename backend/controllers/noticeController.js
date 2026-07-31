@@ -6,7 +6,7 @@ const { buildPaginationResponse } = require('../middleware/pagination');
 // @access  Private (School Admin, Teacher)
 exports.createNotice = async (req, res) => {
   try {
-    const { title, content, category, priority, targetType, targetClasses, targetSections, expiryDate, attachments } = req.body;
+    const { title, content, category, priority, targetType, targetAudience, targetClasses, targetSections, expiryDate, attachments } = req.body;
 
     const notice = await Notice.create({
       title,
@@ -15,7 +15,7 @@ exports.createNotice = async (req, res) => {
       schoolId: req.user.schoolId,
       category,
       priority,
-      targetType,
+      targetType: targetType || targetAudience || 'all',
       targetClasses,
       targetSections,
       publishedBy: req.user.id,
@@ -42,10 +42,10 @@ exports.createNotice = async (req, res) => {
 exports.getNotices = async (req, res) => {
   try {
     const { category, targetType, active } = req.query;
-    const filter = { 
-      tenantId: req.user.tenantId, 
+    const filter = {
+      tenantId: req.user.tenantId,
       schoolId: req.user.schoolId,
-      isActive: true 
+      isActive: true
     };
 
     if (category) filter.category = category;
@@ -76,7 +76,7 @@ exports.getNotices = async (req, res) => {
 // @access  Private
 exports.getNotice = async (req, res) => {
   try {
-    const notice = await Notice.findById(req.params.id)
+    const notice = await Notice.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId })
       .populate('publishedBy', 'name role')
       .populate('targetClasses', 'name sections');
 
@@ -117,7 +117,7 @@ exports.getNotice = async (req, res) => {
 // @access  Private (School Admin, Publisher)
 exports.updateNotice = async (req, res) => {
   try {
-    let notice = await Notice.findById(req.params.id);
+    let notice = await Notice.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!notice) {
       return res.status(404).json({
@@ -144,8 +144,8 @@ exports.updateNotice = async (req, res) => {
 
     const { title, content, category, priority, targetType, targetClasses, targetSections, expiryDate, attachments, isPinned } = req.body;
 
-    notice = await Notice.findByIdAndUpdate(
-      req.params.id,
+    notice = await Notice.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId },
       { title, content, category, priority, targetType, targetClasses, targetSections, expiryDate, attachments, isPinned },
       { new: true, runValidators: true }
     );
@@ -168,7 +168,7 @@ exports.updateNotice = async (req, res) => {
 // @access  Private (School Admin, Publisher)
 exports.deleteNotice = async (req, res) => {
   try {
-    const notice = await Notice.findById(req.params.id);
+    const notice = await Notice.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!notice) {
       return res.status(404).json({
@@ -193,7 +193,7 @@ exports.deleteNotice = async (req, res) => {
       });
     }
 
-    await notice.remove();
+    await notice.deleteOne();
 
     res.status(200).json({
       success: true,
@@ -213,7 +213,7 @@ exports.deleteNotice = async (req, res) => {
 // @access  Private (School Admin)
 exports.togglePinNotice = async (req, res) => {
   try {
-    const notice = await Notice.findById(req.params.id);
+    const notice = await Notice.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!notice) {
       return res.status(404).json({
@@ -251,8 +251,8 @@ exports.togglePinNotice = async (req, res) => {
 // @access  Private
 exports.getMyNotices = async (req, res) => {
   try {
-    const filter = { 
-      tenantId: req.user.tenantId, 
+    const filter = {
+      tenantId: req.user.tenantId,
       schoolId: req.user.schoolId,
       isActive: true,
       $or: [
@@ -263,18 +263,18 @@ exports.getMyNotices = async (req, res) => {
 
     // If student or teacher, check if notice is for their class
     if (req.user.role === 'student' && req.user.studentDetails?.classId) {
-      filter.$or.push({ 
+      filter.$or.push({
         targetType: 'specific_class',
-        targetClasses: req.user.studentDetails.classId 
+        targetClasses: req.user.studentDetails.classId
       });
     }
 
     if (req.user.role === 'teacher') {
       const Teacher = require('../models/Teacher');
-      const teacher = await Teacher.findOne({ userId: req.user._id });
+      const teacher = await Teacher.findOne({ userId: req.user._id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
       if (teacher) {
         const classIds = teacher.classes.map(c => c.classId);
-        filter.$or.push({ 
+        filter.$or.push({
           targetType: 'specific_class',
           targetClasses: { $in: classIds }
         });

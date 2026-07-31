@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import api from '../../utils/api'
+import { useAuth } from '../../contexts/AuthContext'
 import { ArrowLeft, Calendar, CheckCircle, XCircle } from 'lucide-react'
 
 const ChildAttendance = () => {
-  const { childId } = useParams()
+  const { user } = useAuth()
+  const studentId = user?.studentId
   const [attendance, setAttendance] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchAttendance()
-  }, [childId])
+  useEffect(() => { if (studentId) fetchAttendance() }, [studentId])
 
   const fetchAttendance = async () => {
     try {
-      const response = await api.get(`/attendance/student/${childId}`)
+      const response = await api.get(`/attendance/student/${studentId}`)
       setAttendance(response.data.data || [])
     } catch (error) {
       console.error('Failed to fetch attendance:', error)
@@ -31,7 +31,7 @@ const ChildAttendance = () => {
 
   return (
     <div className="space-y-6">
-      <Link to="/parent" className="flex items-center text-gray-600 hover:text-gray-900">
+      <Link to="/parent/dashboard" className="flex items-center text-gray-600 hover:text-gray-900">
         <ArrowLeft className="w-5 h-5 mr-2" /> Back to Parent Portal
       </Link>
 

@@ -2,6 +2,11 @@ const User = require('../models/User');
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
 
+const userScope = (req) => {
+  if (req.user.role === 'super_admin') return {};
+  return { tenantId: req.user.tenantId, schoolId: req.user.schoolId };
+};
+
 // @desc    Get all users (filtered by role and tenant)
 // @route   GET /api/users
 // @access  Private
@@ -42,7 +47,7 @@ exports.getUsers = async (req, res) => {
 // @access  Private
 exports.getUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
+    const user = await User.findOne({ _id: req.params.id, ...userScope(req) }).select('-password');
 
     if (!user) {
       return res.status(404).json({
@@ -52,8 +57,8 @@ exports.getUser = async (req, res) => {
     }
 
     // Check authorization
-    if (req.user.role !== 'super_admin' && 
-        user.tenantId !== req.user.tenantId) {
+    if (req.user.role !== 'super_admin' &&
+      (user.tenantId !== req.user.tenantId || user.schoolId?.toString() !== req.user.schoolId?.toString())) {
       return res.status(403).json({
         success: false,
         error: 'Not authorized to access this user'
@@ -78,7 +83,7 @@ exports.getUser = async (req, res) => {
 // @access  Private
 exports.updateUser = async (req, res) => {
   try {
-    let user = await User.findById(req.params.id);
+    let user = await User.findOne({ _id: req.params.id, ...userScope(req) });
 
     if (!user) {
       return res.status(404).json({
@@ -88,22 +93,30 @@ exports.updateUser = async (req, res) => {
     }
 
     // Check authorization
-    if (req.user.role !== 'super_admin' && 
-        req.user.role !== 'school_admin' &&
-        req.user.id !== user._id.toString()) {
+    const isSelf = req.user.id === user._id.toString();
+    const isSuperAdmin = req.user.role === 'super_admin';
+    const isSameSchoolAdmin = req.user.role === 'school_admin' &&
+      user.tenantId === req.user.tenantId &&
+      user.schoolId?.toString() === req.user.schoolId?.toString();
+    if (!isSelf && !isSuperAdmin && !isSameSchoolAdmin) {
       return res.status(403).json({
         success: false,
         error: 'Not authorized to update this user'
       });
     }
 
-    const { name, phone, profile, studentDetails, teacherDetails, parentDetails } = req.body;
+    const { name, phone, profile, studentDetails, teacherDetails, parentDetails, roleId, isActive } = req.body;
 
-    user = await User.findByIdAndUpdate(
-      req.params.id,
-      { name, phone, profile, studentDetails, teacherDetails, parentDetails },
+    const updateData = { name, phone, profile, studentDetails, teacherDetails, parentDetails };
+    if (roleId !== undefined) updateData.roleId = roleId;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    user = await User.findOneAndUpdate(
+      { _id: req.params.id, ...userScope(req) },
+      updateData,
       { new: true, runValidators: true }
-    ).select('-password');
+    ).select('-password')
+      .populate('roleId', 'name slug permissionCodes');
 
     res.status(200).json({
       success: true,
@@ -123,7 +136,7 @@ exports.updateUser = async (req, res) => {
 // @access  Private (Admin only)
 exports.deleteUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findOne({ _id: req.params.id, ...userScope(req) });
 
     if (!user) {
       return res.status(404).json({
@@ -133,8 +146,12 @@ exports.deleteUser = async (req, res) => {
     }
 
     // Check authorization
-    if (req.user.role !== 'super_admin' && 
-        req.user.role !== 'school_admin') {
+    const canDelete = req.user.role === 'super_admin' || (
+      req.user.role === 'school_admin' &&
+      user.tenantId === req.user.tenantId &&
+      user.schoolId?.toString() === req.user.schoolId?.toString()
+    );
+    if (!canDelete) {
       return res.status(403).json({
         success: false,
         error: 'Not authorized to delete users'
@@ -238,7 +255,7 @@ exports.getTeachers = async (req, res) => {
 // @access  Private (Admin only)
 exports.updateUserStatus = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findOne({ _id: req.params.id, ...userScope(req) });
 
     if (!user) {
       return res.status(404).json({
@@ -248,8 +265,12 @@ exports.updateUserStatus = async (req, res) => {
     }
 
     // Check authorization
-    if (req.user.role !== 'super_admin' && 
-        req.user.role !== 'school_admin') {
+    const canUpdateStatus = req.user.role === 'super_admin' || (
+      req.user.role === 'school_admin' &&
+      user.tenantId === req.user.tenantId &&
+      user.schoolId?.toString() === req.user.schoolId?.toString()
+    );
+    if (!canUpdateStatus) {
       return res.status(403).json({
         success: false,
         error: 'Not authorized to update user status'

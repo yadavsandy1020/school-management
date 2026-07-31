@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../../utils/api'
-import { Plus, Calendar, Clock } from 'lucide-react'
+import { Plus, Calendar } from 'lucide-react'
 
 const TimetableList = () => {
   const [timetables, setTimetables] = useState([])

@@ -83,7 +83,7 @@ exports.getTimetables = async (req, res) => {
 // @access  Private
 exports.getTimetable = async (req, res) => {
   try {
-    const timetable = await Timetable.findById(req.params.id)
+    const timetable = await Timetable.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId })
       .populate('classId', 'name')
       .populate('periods.subjectId', 'name')
       .populate('periods.teacherId', 'personalInfo.firstName personalInfo.lastName');
@@ -120,7 +120,7 @@ exports.getTimetable = async (req, res) => {
 // @access  Private (School Admin)
 exports.updateTimetable = async (req, res) => {
   try {
-    let timetable = await Timetable.findById(req.params.id);
+    let timetable = await Timetable.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!timetable) {
       return res.status(404).json({
@@ -137,7 +137,7 @@ exports.updateTimetable = async (req, res) => {
       });
     }
 
-    timetable = await Timetable.findByIdAndUpdate(req.params.id, req.body, {
+    timetable = await Timetable.findOneAndUpdate({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId }, req.body, {
       new: true,
       runValidators: true
     });
@@ -159,7 +159,7 @@ exports.updateTimetable = async (req, res) => {
 // @access  Private (School Admin)
 exports.deleteTimetable = async (req, res) => {
   try {
-    const timetable = await Timetable.findById(req.params.id);
+    const timetable = await Timetable.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!timetable) {
       return res.status(404).json({

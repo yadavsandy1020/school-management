@@ -2,28 +2,43 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 const { paginate } = require('../middleware/pagination');
+const { requireActiveLicense, requireFeature, requireWriteAccess } = require('../middleware/saas');
 const {
   markAttendance,
   updateAttendance,
   getAttendance,
   getAttendanceById,
   getStudentAttendance,
+  getStudentAttendanceSummary,
   getClassAttendanceReport,
-  deleteAttendance
+  deleteAttendance,
+  markSelfAttendance,
+  getSelfAttendance,
+  getAllTeacherAttendance
 } = require('../controllers/attendanceController');
 
 router.use(paginate);
+router.use(protect, requireActiveLicense, requireFeature('ATTENDANCE'));
 
 router.route('/')
-  .post(protect, authorize('school_admin', 'teacher'), markAttendance)
-  .get(protect, getAttendance);
+  .post(authorize('school_admin', 'teacher'), requireWriteAccess, markAttendance)
+  .get(authorize('school_admin', 'super_admin', 'teacher', 'parent'), getAttendance);
 
-router.get('/student/:studentId', protect, getStudentAttendance);
-router.get('/report/:classId', protect, getClassAttendanceReport);
+// Teacher self-attendance
+router.post('/self', authorize('teacher'), markSelfAttendance);
+router.get('/self', authorize('teacher'), getSelfAttendance);
+
+// Teacher attendance admin view
+router.get('/teachers', authorize('school_admin', 'super_admin'), getAllTeacherAttendance);
+
+// Student attendance
+router.get('/student/:studentId/summary', getStudentAttendanceSummary);
+router.get('/student/:studentId', getStudentAttendance);
+router.get('/report/:classId', getClassAttendanceReport);
 
 router.route('/:id')
-  .get(protect, getAttendanceById)
-  .put(protect, authorize('school_admin', 'teacher'), updateAttendance)
-  .delete(protect, authorize('school_admin'), deleteAttendance);
+  .get(getAttendanceById)
+  .put(authorize('school_admin', 'teacher'), requireWriteAccess, updateAttendance)
+  .delete(authorize('school_admin'), requireWriteAccess, deleteAttendance);
 
 module.exports = router;

@@ -1,6 +1,10 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
+const Student = require('../models/Student');
 const School = require('../models/School');
+const Role = require('../models/Role');
+const { createAuditLog } = require('../utils/audit');
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -14,6 +18,12 @@ const generateRefreshToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh', {
     expiresIn: '30d'
   });
+};
+
+// Resolve default system role id for a given role slug
+const getDefaultRoleId = async (roleSlug) => {
+  const role = await Role.findOne({ slug: roleSlug, tenantId: { $exists: false }, isActive: true });
+  return role ? role._id : null;
 };
 
 // @desc    Register user
@@ -50,6 +60,9 @@ exports.register = async (req, res) => {
       }
     }
 
+    // Resolve default role for non-super-admin users
+    const roleId = role === 'super_admin' ? null : await getDefaultRoleId(role);
+
     // Create user
     const user = await User.create({
       name,
@@ -57,6 +70,7 @@ exports.register = async (req, res) => {
       password,
       phone,
       role,
+      roleId,
       tenantId,
       schoolId
     });
@@ -72,6 +86,7 @@ exports.register = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        roleId: user.roleId,
         tenantId: user.tenantId,
         schoolId: user.schoolId
       }
@@ -129,13 +144,14 @@ exports.login = async (req, res) => {
     // For non-super-admin, validate tenant
     if (user.role !== 'super_admin') {
       if (!tenantId) {
-        return res.status(400).json({
-          success: false,
-          error: 'Tenant ID is required'
-        });
-      }
-
-      if (user.tenantId !== tenantId) {
+        // Derive tenant from the user's school/tenant record when UI does not send it
+        if (!user.tenantId) {
+          return res.status(400).json({
+            success: false,
+            error: 'Tenant not assigned to user'
+          });
+        }
+      } else if (user.tenantId !== tenantId) {
         return res.status(403).json({
           success: false,
           error: 'You are not authorized for this tenant'
@@ -146,11 +162,35 @@ exports.login = async (req, res) => {
     // Update last login
     user.lastLogin = Date.now();
 
+    // Resolve default role if not set
+    if (!user.roleId && user.role !== 'super_admin') {
+      user.roleId = await getDefaultRoleId(user.role);
+      if (user.roleId) await user.save({ validateBeforeSave: false });
+    }
+
     // Generate tokens
     const token = generateToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
     user.refreshToken = refreshToken;
     await user.save();
+
+    // Populate role permissions
+    await user.populate('roleId', 'name slug permissionCodes');
+    const permissions = user.roleId?.permissionCodes || [];
+
+    // Audit login
+    createAuditLog({
+      tenantId: user.tenantId,
+      schoolId: user.schoolId,
+      user,
+      action: 'LOGIN',
+      module: 'auth',
+      description: `User ${user.email} logged in`,
+      entity: 'User',
+      entityId: user._id.toString(),
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    }).catch(() => { });
 
     res.status(200).json({
       success: true,
@@ -161,9 +201,89 @@ exports.login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        roleId: user.roleId,
+        permissions,
         tenantId: user.tenantId,
         schoolId: user.schoolId,
         profile: user.profile
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// @desc    Parent login (Roll No + DOB)
+// @route   POST /api/auth/parent-login
+// @access  Public
+exports.parentLogin = async (req, res) => {
+  try {
+    const { rollNo, dateOfBirth, classId } = req.body;
+
+    if (!rollNo || !dateOfBirth) {
+      return res.status(400).json({
+        success: false,
+        error: 'Roll number and date of birth are required'
+      });
+    }
+
+    const dob = new Date(dateOfBirth);
+    if (Number.isNaN(dob.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid date of birth format'
+      });
+    }
+
+    // Build query to find the student by rollNo + DOB
+    const query = {
+      rollNo,
+      'personalInfo.dateOfBirth': dob,
+      isActive: true
+    };
+    if (classId && mongoose.Types.ObjectId.isValid(classId)) {
+      query.classId = classId;
+    }
+
+    const student = await Student.findOne(query)
+      .populate('classId', 'name sections')
+      .populate('schoolId', 'name shortName address contact');
+
+    if (!student) {
+      return res.status(401).json({
+        success: false,
+        error: 'No student found with the provided roll number and date of birth'
+      });
+    }
+
+    // Generate a JWT with role parent and studentId embedded
+    const token = jwt.sign(
+      { id: student._id, role: 'parent', studentId: student._id, tenantId: student.tenantId, schoolId: student.schoolId },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+    );
+
+    res.status(200).json({
+      success: true,
+      token,
+      user: {
+        id: student._id,
+        role: 'parent',
+        studentId: student._id,
+        name: `${student.personalInfo.firstName} ${student.personalInfo.lastName}`,
+        tenantId: student.tenantId,
+        schoolId: student.schoolId,
+        student: {
+          admissionNo: student.admissionNo,
+          rollNo: student.rollNo,
+          classId: student.classId?._id,
+          className: student.classId?.name,
+          section: student.section
+        }
       }
     });
   } catch (error) {
@@ -180,11 +300,14 @@ exports.login = async (req, res) => {
 // @access  Private
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id).populate('roleId', 'name slug permissionCodes');
 
     res.status(200).json({
       success: true,
-      user
+      user: {
+        ...user.toObject(),
+        permissions: user.roleId?.permissionCodes || []
+      }
     });
   } catch (error) {
     console.error(error);

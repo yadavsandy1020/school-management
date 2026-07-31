@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import api from '../../utils/api'
 import { ArrowLeft, DollarSign, Download, CheckCircle, Clock } from 'lucide-react'
 
 const ChildFees = () => {
-  const { childId } = useParams()
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchFees()
-  }, [childId])
+  useEffect(() => { fetchFees() }, [])
 
   const fetchFees = async () => {
     try {
@@ -25,7 +22,13 @@ const ChildFees = () => {
 
   const downloadReceipt = async (invoiceId) => {
     try {
-      window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/fees/invoice/${invoiceId}/receipt`, '_blank')
+      const response = await api.get(`/fees/invoice/${invoiceId}/receipt`, { responseType: 'blob' })
+      const url = URL.createObjectURL(response.data)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `receipt-${invoiceId}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Failed to download receipt:', error)
     }
@@ -38,7 +41,7 @@ const ChildFees = () => {
 
   return (
     <div className="space-y-6">
-      <Link to="/parent" className="flex items-center text-gray-600 hover:text-gray-900">
+      <Link to="/parent/dashboard" className="flex items-center text-gray-600 hover:text-gray-900">
         <ArrowLeft className="w-5 h-5 mr-2" /> Back to Parent Portal
       </Link>
 

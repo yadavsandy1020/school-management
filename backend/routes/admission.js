@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 const { paginate } = require('../middleware/pagination');
+const { requireActiveLicense, requireFeature, requireWriteAccess, checkStudentLimit } = require('../middleware/saas');
 const {
   createAdmission,
   getAdmissions,
@@ -15,19 +16,20 @@ const {
 } = require('../controllers/admissionController');
 
 router.use(paginate);
+router.use(protect, requireActiveLicense, requireFeature('ADMISSIONS'));
 
 router.route('/')
-  .post(createAdmission)
-  .get(protect, getAdmissions);
+  .post(authorize('school_admin'), requireWriteAccess, createAdmission)
+  .get(getAdmissions);
 
 router.route('/:id')
-  .get(protect, getAdmission)
-  .put(protect, authorize('school_admin'), updateAdmission)
-  .delete(protect, authorize('school_admin'), deleteAdmission);
+  .get(getAdmission)
+  .put(authorize('school_admin'), requireWriteAccess, updateAdmission)
+  .delete(authorize('school_admin'), requireWriteAccess, deleteAdmission);
 
-router.put('/:id/review', protect, authorize('school_admin'), reviewAdmission);
-router.put('/:id/approve', protect, authorize('school_admin'), approveAdmission);
-router.put('/:id/reject', protect, authorize('school_admin'), rejectAdmission);
-router.post('/:id/enroll', protect, authorize('school_admin'), enrollStudent);
+router.put('/:id/review', authorize('school_admin'), requireWriteAccess, reviewAdmission);
+router.put('/:id/approve', authorize('school_admin'), requireWriteAccess, approveAdmission);
+router.put('/:id/reject', authorize('school_admin'), requireWriteAccess, rejectAdmission);
+router.post('/:id/enroll', authorize('school_admin'), requireWriteAccess, checkStudentLimit(1), enrollStudent);
 
 module.exports = router;

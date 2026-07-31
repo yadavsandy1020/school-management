@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
+const { requireActiveLicense, requireWriteAccess } = require('../middleware/saas');
 const {
   getUsers,
   getUser,
@@ -11,17 +12,19 @@ const {
   updateUserStatus
 } = require('../controllers/userController');
 
-router.route('/')
-  .get(protect, getUsers);
+router.use(protect, requireActiveLicense);
 
-router.get('/students', protect, getStudents);
-router.get('/teachers', protect, getTeachers);
+router.route('/')
+  .get(getUsers);
+
+router.get('/students', getStudents);
+router.get('/teachers', getTeachers);
 
 router.route('/:id')
-  .get(protect, getUser)
-  .put(protect, updateUser)
-  .delete(protect, authorize('school_admin', 'super_admin'), deleteUser);
+  .get(getUser)
+  .put(requireWriteAccess, updateUser)
+  .delete(authorize('school_admin', 'super_admin'), requireWriteAccess, deleteUser);
 
-router.put('/:id/status', protect, authorize('school_admin', 'super_admin'), updateUserStatus);
+router.put('/:id/status', authorize('school_admin', 'super_admin'), requireWriteAccess, updateUserStatus);
 
 module.exports = router;

@@ -64,7 +64,15 @@ const StudentForm = () => {
   const fetchStudent = async () => {
     try {
       const response = await api.get(`/students/${id}`)
-      setFormData(response.data.student)
+      const student = response.data.student
+      setFormData({
+        ...student,
+        classId: student.classId?._id || student.classId || '',
+        personalInfo: {
+          ...student.personalInfo,
+          dateOfBirth: student.personalInfo?.dateOfBirth?.slice(0, 10) || ''
+        }
+      })
     } catch (error) {
       console.error('Failed to fetch student:', error)
     }

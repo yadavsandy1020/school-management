@@ -1,8 +1,19 @@
 const Teacher = require('../models/Teacher');
+const TeacherSalaryPayment = require('../models/TeacherSalaryPayment');
 const User = require('../models/User');
 const Subject = require('../models/Subject');
 const Class = require('../models/Class');
 const { buildPaginationResponse } = require('../middleware/pagination');
+const { getNextNumber } = require('../services/sequenceService');
+
+const computeTotalSalary = (salaryDetails) => {
+  if (!salaryDetails) return 0;
+  const basic = salaryDetails.basicSalary || 0;
+  const allowances = salaryDetails.allowances || {};
+  const totalAllowances = (allowances.da || 0) + (allowances.hra || 0) +
+    (allowances.ta || 0) + (allowances.others || 0);
+  return basic + totalAllowances;
+};
 
 // @desc    Create teacher
 // @route   POST /api/teachers
@@ -22,8 +33,21 @@ exports.createTeacher = async (req, res) => {
       customFields
     } = req.body;
 
+    if (contactInfo && typeof contactInfo.address === 'string') {
+      contactInfo.address = { street: contactInfo.address };
+    }
+
+    const finalEmployeeId = employeeId && employeeId.trim()
+      ? employeeId.trim()
+      : await getNextNumber({
+        tenantId: req.user.tenantId,
+        schoolId: req.user.schoolId,
+        entityType: 'teacher',
+        academicSession: employmentDetails?.academicSession || new Date().getFullYear().toString()
+      });
+
     // Check if employee ID already exists
-    const existingTeacher = await Teacher.findOne({ employeeId });
+    const existingTeacher = await Teacher.findOne({ employeeId: finalEmployeeId, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
     if (existingTeacher) {
       return res.status(400).json({
         success: false,
@@ -31,9 +55,13 @@ exports.createTeacher = async (req, res) => {
       });
     }
 
+    if (salaryDetails) {
+      salaryDetails.totalSalary = computeTotalSalary(salaryDetails);
+    }
+
     // Create teacher
     const teacher = await Teacher.create({
-      employeeId,
+      employeeId: finalEmployeeId,
       tenantId: req.user.tenantId,
       schoolId: req.user.schoolId,
       personalInfo,
@@ -87,7 +115,26 @@ exports.getTeachers = async (req, res) => {
       .populate('classes.classId', 'name')
       .sort({ 'personalInfo.firstName': 1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
+
+    // Attach salary stats
+    const teacherIds = teachers.map((t) => t._id);
+    const paymentSums = await TeacherSalaryPayment.aggregate([
+      { $match: { teacherId: { $in: teacherIds }, tenantId: req.user.tenantId, schoolId: req.user.schoolId } },
+      { $group: { _id: '$teacherId', paid: { $sum: '$amount' } } }
+    ]);
+    const paidMap = new Map(paymentSums.map((p) => [p._id.toString(), p.paid]));
+
+    teachers.forEach((t) => {
+      const totalSalary = t.salaryDetails?.totalSalary || 0;
+      const paid = paidMap.get(t._id.toString()) || 0;
+      t.salaryStats = {
+        total: totalSalary,
+        paid,
+        outstanding: totalSalary - paid
+      };
+    });
 
     res.status(200).json(buildPaginationResponse(teachers, total, page, limit));
   } catch (error) {
@@ -104,7 +151,7 @@ exports.getTeachers = async (req, res) => {
 // @access  Private
 exports.getTeacher = async (req, res) => {
   try {
-    const teacher = await Teacher.findById(req.params.id)
+    const teacher = await Teacher.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId })
       .populate('subjects', 'name code')
       .populate('classes.classId', 'name sections')
       .populate('userId', 'name email');
@@ -124,9 +171,28 @@ exports.getTeacher = async (req, res) => {
       });
     }
 
+    const totalSalary = teacher.salaryDetails?.totalSalary || 0;
+    const paymentSum = await TeacherSalaryPayment.aggregate([
+      { $match: { teacherId: teacher._id, tenantId: req.user.tenantId, schoolId: req.user.schoolId } },
+      { $group: { _id: null, paid: { $sum: '$amount' } } }
+    ]);
+    const paid = paymentSum[0]?.paid || 0;
+    const recentPayments = await TeacherSalaryPayment.find({
+      teacherId: teacher._id,
+      tenantId: req.user.tenantId,
+      schoolId: req.user.schoolId
+    })
+      .sort({ paymentDate: -1 })
+      .limit(10)
+      .lean();
+
+    const teacherObj = teacher.toObject();
+    teacherObj.salaryStats = { total: totalSalary, paid, outstanding: totalSalary - paid };
+    teacherObj.salaryPayments = recentPayments;
+
     res.status(200).json({
       success: true,
-      teacher
+      teacher: teacherObj
     });
   } catch (error) {
     console.error(error);
@@ -142,7 +208,7 @@ exports.getTeacher = async (req, res) => {
 // @access  Private (School Admin)
 exports.updateTeacher = async (req, res) => {
   try {
-    let teacher = await Teacher.findById(req.params.id);
+    let teacher = await Teacher.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!teacher) {
       return res.status(404).json({
@@ -171,8 +237,16 @@ exports.updateTeacher = async (req, res) => {
       customFields
     } = req.body;
 
-    teacher = await Teacher.findByIdAndUpdate(
-      req.params.id,
+    if (contactInfo && typeof contactInfo.address === 'string') {
+      contactInfo.address = { street: contactInfo.address };
+    }
+
+    if (salaryDetails) {
+      salaryDetails.totalSalary = computeTotalSalary(salaryDetails);
+    }
+
+    teacher = await Teacher.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId },
       { personalInfo, contactInfo, employmentDetails, subjects, classes, salaryDetails, photo, documents, customFields },
       { new: true, runValidators: true }
     ).populate('subjects', 'name code');
@@ -195,7 +269,7 @@ exports.updateTeacher = async (req, res) => {
 // @access  Private (School Admin)
 exports.deleteTeacher = async (req, res) => {
   try {
-    const teacher = await Teacher.findById(req.params.id);
+    const teacher = await Teacher.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!teacher) {
       return res.status(404).json({
@@ -214,7 +288,7 @@ exports.deleteTeacher = async (req, res) => {
 
     // Remove as class teacher from classes
     await Class.updateMany(
-      { classTeacher: teacher._id },
+      { classTeacher: teacher._id, tenantId: req.user.tenantId, schoolId: req.user.schoolId },
       { $unset: { classTeacher: 1 } }
     );
 
@@ -242,7 +316,7 @@ exports.deleteTeacher = async (req, res) => {
 exports.assignSubjects = async (req, res) => {
   try {
     const { subjects } = req.body;
-    const teacher = await Teacher.findById(req.params.id);
+    const teacher = await Teacher.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!teacher) {
       return res.status(404).json({
@@ -264,11 +338,11 @@ exports.assignSubjects = async (req, res) => {
 
     // Update subject documents
     await Subject.updateMany(
-      { _id: { $in: subjects } },
+      { _id: { $in: subjects }, tenantId: req.user.tenantId, schoolId: req.user.schoolId },
       { $addToSet: { teachers: teacher._id } }
     );
 
-    const updatedTeacher = await Teacher.findById(teacher._id).populate('subjects', 'name code');
+    const updatedTeacher = await Teacher.findOne({ _id: teacher._id, tenantId: req.user.tenantId, schoolId: req.user.schoolId }).populate('subjects', 'name code');
 
     res.status(200).json({
       success: true,
@@ -289,7 +363,7 @@ exports.assignSubjects = async (req, res) => {
 exports.assignClasses = async (req, res) => {
   try {
     const { classes } = req.body;
-    const teacher = await Teacher.findById(req.params.id);
+    const teacher = await Teacher.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!teacher) {
       return res.status(404).json({
@@ -312,14 +386,14 @@ exports.assignClasses = async (req, res) => {
     // Update class documents for class teachers
     for (const classAssignment of classes) {
       if (classAssignment.role === 'class_teacher' || classAssignment.role === 'both') {
-        await Class.findByIdAndUpdate(
-          classAssignment.classId,
+        await Class.findOneAndUpdate(
+          { _id: classAssignment.classId, tenantId: req.user.tenantId, schoolId: req.user.schoolId },
           { classTeacher: teacher._id }
         );
       }
     }
 
-    const updatedTeacher = await Teacher.findById(teacher._id).populate('classes.classId', 'name');
+    const updatedTeacher = await Teacher.findOne({ _id: teacher._id, tenantId: req.user.tenantId, schoolId: req.user.schoolId }).populate('classes.classId', 'name');
 
     res.status(200).json({
       success: true,
@@ -339,7 +413,7 @@ exports.assignClasses = async (req, res) => {
 // @access  Private (School Admin)
 exports.updateSalary = async (req, res) => {
   try {
-    const teacher = await Teacher.findById(req.params.id);
+    const teacher = await Teacher.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!teacher) {
       return res.status(404).json({
@@ -356,14 +430,9 @@ exports.updateSalary = async (req, res) => {
       });
     }
 
-    teacher.salaryDetails = req.body.salaryDetails;
-    
-    // Calculate total salary
-    const { basicSalary, allowances } = teacher.salaryDetails;
-    const totalAllowances = (allowances?.da || 0) + (allowances?.hra || 0) + 
-                           (allowances?.ta || 0) + (allowances?.others || 0);
-    teacher.salaryDetails.totalSalary = basicSalary + totalAllowances;
-    
+    teacher.salaryDetails = req.body.salaryDetails || {};
+    teacher.salaryDetails.totalSalary = computeTotalSalary(teacher.salaryDetails);
+
     await teacher.save();
 
     res.status(200).json({

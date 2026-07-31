@@ -11,6 +11,8 @@ export const ThemeProvider = ({ children }) => {
     fontFamily: 'Inter',
   })
   const [logo, setLogo] = useState('')
+  const [schoolName, setSchoolName] = useState('')
+  const [schoolShortName, setSchoolShortName] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -25,11 +27,14 @@ export const ThemeProvider = ({ children }) => {
   const fetchTheme = async (tenantId) => {
     try {
       const response = await api.get(`/schools/tenant/${tenantId}`)
-      const schoolTheme = response.data.school.theme
-      const schoolLogo = response.data.school.logo
+      const school = response.data.school
+      const schoolTheme = school.theme
+      const schoolLogo = school.logo
 
       setTheme(schoolTheme)
       setLogo(schoolLogo)
+      setSchoolName(school.name || '')
+      setSchoolShortName(school.shortName || '')
 
       // Apply theme colors to CSS variables
       document.documentElement.style.setProperty('--primary-color', schoolTheme.primaryColor)
@@ -47,6 +52,8 @@ export const ThemeProvider = ({ children }) => {
   const value = {
     theme,
     logo,
+    schoolName,
+    schoolShortName,
     loading,
     fetchTheme,
   }

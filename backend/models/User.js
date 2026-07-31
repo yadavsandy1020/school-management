@@ -23,8 +23,17 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['super_admin', 'school_admin', 'teacher', 'student', 'parent'],
+    enum: ['super_admin', 'school_admin', 'teacher', 'accountant', 'receptionist', 'student', 'parent'],
     required: true
+  },
+  roleId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role'
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+    index: true
   },
   tenantId: {
     type: String,
@@ -107,7 +116,7 @@ const userSchema = new mongoose.Schema({
 // Hash password before saving
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
@@ -131,7 +140,6 @@ userSchema.methods.getResetPasswordToken = function () {
 };
 
 // Indexes
-userSchema.index({ email: 1 });
 userSchema.index({ tenantId: 1, role: 1 });
 userSchema.index({ schoolId: 1 });
 

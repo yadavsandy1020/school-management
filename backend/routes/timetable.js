@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 const { paginate } = require('../middleware/pagination');
+const { requireActiveLicense, requireFeature, requireWriteAccess } = require('../middleware/saas');
 const {
   createTimetable,
   getTimetables,
@@ -12,16 +13,17 @@ const {
 } = require('../controllers/timetableController');
 
 router.use(paginate);
+router.use(protect, requireActiveLicense, requireFeature('TIMETABLE'));
 
 router.route('/')
-  .post(protect, authorize('school_admin'), createTimetable)
-  .get(protect, getTimetables);
+  .post(authorize('school_admin'), requireWriteAccess, createTimetable)
+  .get(getTimetables);
+
+router.get('/class/:classId/:section', getClassTimetable);
 
 router.route('/:id')
-  .get(protect, getTimetable)
-  .put(protect, authorize('school_admin'), updateTimetable)
-  .delete(protect, authorize('school_admin'), deleteTimetable);
-
-router.get('/class/:classId/:section', protect, getClassTimetable);
+  .get(getTimetable)
+  .put(authorize('school_admin'), requireWriteAccess, updateTimetable)
+  .delete(authorize('school_admin'), requireWriteAccess, deleteTimetable);
 
 module.exports = router;

@@ -2,6 +2,8 @@ const Student = require('../models/Student');
 const User = require('../models/User');
 const Class = require('../models/Class');
 const { buildPaginationResponse } = require('../middleware/pagination');
+const { getNextNumber } = require('../services/sequenceService');
+const licenseService = require('../services/licenseService');
 
 // @desc    Create student
 // @route   POST /api/students
@@ -22,8 +24,21 @@ exports.createStudent = async (req, res) => {
       customFields
     } = req.body;
 
+    if (contactInfo && typeof contactInfo.address === 'string') {
+      contactInfo.address = { street: contactInfo.address };
+    }
+
+    const finalAdmissionNo = admissionNo && admissionNo.trim()
+      ? admissionNo.trim()
+      : await getNextNumber({
+        tenantId: req.user.tenantId,
+        schoolId: req.user.schoolId,
+        entityType: 'student',
+        academicSession: academicSession || new Date().getFullYear().toString()
+      });
+
     // Check if admission number already exists
-    const existingStudent = await Student.findOne({ admissionNo });
+    const existingStudent = await Student.findOne({ admissionNo: finalAdmissionNo, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
     if (existingStudent) {
       return res.status(400).json({
         success: false,
@@ -32,7 +47,7 @@ exports.createStudent = async (req, res) => {
     }
 
     // Validate class
-    const classData = await Class.findById(classId);
+    const classData = await Class.findOne({ _id: classId, tenantId: req.user.tenantId, schoolId: req.user.schoolId, isActive: true });
     if (!classData) {
       return res.status(404).json({
         success: false,
@@ -40,9 +55,21 @@ exports.createStudent = async (req, res) => {
       });
     }
 
+    // License student limit enforcement
+    const limitCheck = await licenseService.checkStudentLimit(req.user.tenantId, req.user.schoolId, 1);
+    if (!limitCheck.allowed) {
+      return res.status(403).json({
+        success: false,
+        error: limitCheck.reason,
+        current: limitCheck.current,
+        limit: limitCheck.limit,
+        remaining: limitCheck.remaining
+      });
+    }
+
     // Create student
     const student = await Student.create({
-      admissionNo,
+      admissionNo: finalAdmissionNo,
       rollNo,
       tenantId: req.user.tenantId,
       schoolId: req.user.schoolId,
@@ -85,6 +112,7 @@ exports.getStudents = async (req, res) => {
     if (classId) filter.classId = classId;
     if (section) filter.section = section;
     if (academicSession) filter.academicSession = academicSession;
+    if (req.user.role === 'parent') filter._id = req.user.studentId;
 
     // Search functionality
     if (search) {
@@ -120,7 +148,11 @@ exports.getStudents = async (req, res) => {
 // @access  Private
 exports.getStudent = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id)
+    const student = await Student.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+      schoolId: req.user.schoolId
+    })
       .populate('classId', 'name sections')
       .populate('parentId', 'name email phone parentDetails');
 
@@ -132,7 +164,7 @@ exports.getStudent = async (req, res) => {
     }
 
     // Check tenant access
-    if (student.tenantId !== req.user.tenantId) {
+    if (student.tenantId !== req.user.tenantId || (req.user.role === 'parent' && student._id.toString() !== req.user.studentId.toString())) {
       return res.status(403).json({
         success: false,
         error: 'Not authorized to access this student'
@@ -152,12 +184,35 @@ exports.getStudent = async (req, res) => {
   }
 };
 
+// @desc    Get logged in student's profile
+// @route   GET /api/students/profile
+// @access  Private (Student)
+exports.getStudentProfile = async (req, res) => {
+  try {
+    const student = await Student.findOne({
+      tenantId: req.user.tenantId,
+      schoolId: req.user.schoolId,
+      userId: req.user._id,
+      isActive: true
+    }).populate('classId', 'name sections');
+
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student profile not found' });
+    }
+
+    res.status(200).json({ success: true, data: student });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // @desc    Update student
 // @route   PUT /api/students/:id
 // @access  Private (School Admin)
 exports.updateStudent = async (req, res) => {
   try {
-    let student = await Student.findById(req.params.id);
+    let student = await Student.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!student) {
       return res.status(404).json({
@@ -186,10 +241,14 @@ exports.updateStudent = async (req, res) => {
       customFields
     } = req.body;
 
+    if (contactInfo && typeof contactInfo.address === 'string') {
+      contactInfo.address = { street: contactInfo.address };
+    }
+
     // If class is changing, update old and new class strengths
     if (classId && classId !== student.classId.toString()) {
-      const oldClass = await Class.findById(student.classId);
-      const newClass = await Class.findById(classId);
+      const oldClass = await Class.findOne({ _id: student.classId, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
+      const newClass = await Class.findOne({ _id: classId, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
       if (oldClass) {
         oldClass.currentStrength = Math.max(0, oldClass.currentStrength - 1);
@@ -202,8 +261,8 @@ exports.updateStudent = async (req, res) => {
       }
     }
 
-    student = await Student.findByIdAndUpdate(
-      req.params.id,
+    student = await Student.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId },
       { rollNo, classId, section, personalInfo, contactInfo, parentInfo, photo, documents, customFields },
       { new: true, runValidators: true }
     ).populate('classId', 'name sections');
@@ -226,7 +285,7 @@ exports.updateStudent = async (req, res) => {
 // @access  Private (School Admin)
 exports.deleteStudent = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id);
+    const student = await Student.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!student) {
       return res.status(404).json({
@@ -244,7 +303,7 @@ exports.deleteStudent = async (req, res) => {
     }
 
     // Update class strength
-    const classData = await Class.findById(student.classId);
+    const classData = await Class.findOne({ _id: student.classId, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
     if (classData) {
       classData.currentStrength = Math.max(0, classData.currentStrength - 1);
       await classData.save();
@@ -256,9 +315,16 @@ exports.deleteStudent = async (req, res) => {
     student.leavingDate = Date.now();
     await student.save();
 
+    // Reset linked admission so it can be re-enrolled
+    const Admission = require('../models/Admission');
+    await Admission.updateOne(
+      { enrolledStudentId: student._id, status: 'enrolled' },
+      { $set: { status: 'approved' } }
+    );
+
     res.status(200).json({
       success: true,
-      message: 'Student deleted successfully'
+      message: 'Student deleted successfully. Linked admission reset to approved for re-enrollment.'
     });
   } catch (error) {
     console.error(error);
@@ -275,8 +341,8 @@ exports.deleteStudent = async (req, res) => {
 exports.linkParent = async (req, res) => {
   try {
     const { parentId } = req.body;
-    const student = await Student.findById(req.params.id);
-    const parent = await User.findById(parentId);
+    const student = await Student.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
+    const parent = await User.findOne({ _id: parentId, tenantId: req.user.tenantId, role: 'parent' });
 
     if (!student) {
       return res.status(404).json({
@@ -326,6 +392,20 @@ exports.bulkImportStudents = async (req, res) => {
     const results = [];
     const errors = [];
 
+    const requestedCount = Array.isArray(students) ? students.length : 0;
+
+    // License student limit enforcement
+    const limitCheck = await licenseService.checkStudentLimit(req.user.tenantId, req.user.schoolId, requestedCount);
+    if (!limitCheck.allowed) {
+      return res.status(403).json({
+        success: false,
+        error: limitCheck.reason,
+        current: limitCheck.current,
+        limit: limitCheck.limit,
+        remaining: limitCheck.remaining
+      });
+    }
+
     for (const studentData of students) {
       try {
         const student = await Student.create({
@@ -335,7 +415,7 @@ exports.bulkImportStudents = async (req, res) => {
         });
 
         // Update class strength
-        const classData = await Class.findById(student.classId);
+        const classData = await Class.findOne({ _id: student.classId, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
         if (classData) {
           classData.currentStrength += 1;
           await classData.save();
@@ -356,6 +436,37 @@ exports.bulkImportStudents = async (req, res) => {
       failed: errors.length,
       results,
       errors
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+exports.getStudentByAdmissionNo = async (req, res) => {
+  try {
+    const student = await Student.findOne({
+      admissionNo: req.params.admissionNo,
+      tenantId: req.user.tenantId,
+      schoolId: req.user.schoolId,
+      isActive: true
+    })
+      .populate('classId', 'name sections')
+      .populate('parentId', 'name email phone');
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        error: 'Student not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      student
     });
   } catch (error) {
     console.error(error);

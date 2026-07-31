@@ -62,6 +62,33 @@ const TeacherDetail = () => {
           </div>
         </div>
       </div>
+
+      <div className="card">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Salary Summary</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl">
+            <p className="text-xs text-slate-500 uppercase">Total Salary</p>
+            <p className="text-xl font-bold text-slate-900 dark:text-white">₹{(teacher.salaryStats?.total || 0).toLocaleString()}</p>
+          </div>
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl">
+            <p className="text-xs text-slate-500 uppercase">Paid</p>
+            <p className="text-xl font-bold text-emerald-600">₹{(teacher.salaryStats?.paid || 0).toLocaleString()}</p>
+          </div>
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl">
+            <p className="text-xs text-slate-500 uppercase">Outstanding</p>
+            <p className="text-xl font-bold text-rose-600">₹{(teacher.salaryStats?.outstanding || 0).toLocaleString()}</p>
+          </div>
+        </div>
+        <h4 className="text-sm font-semibold text-gray-900 mb-2">Recent Payments</h4>
+        <div className="space-y-2">
+          {teacher.salaryPayments?.length ? teacher.salaryPayments.map((p) => (
+            <div key={p._id} className="flex justify-between border-b border-slate-100 dark:border-slate-800 py-2">
+              <span className="text-sm text-slate-600">{new Date(p.paymentDate).toLocaleDateString()} • {p.month}/{p.year}</span>
+              <span className="text-sm font-semibold">₹{p.amount.toLocaleString()}</span>
+            </div>
+          )) : <p className="text-sm text-slate-500">No payments recorded.</p>}
+        </div>
+      </div>
     </div>
   )
 }

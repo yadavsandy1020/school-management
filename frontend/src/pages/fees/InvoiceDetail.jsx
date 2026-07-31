@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../../utils/api'
-import { ArrowLeft, DollarSign, Download } from 'lucide-react'
+import { ArrowLeft, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const InvoiceDetail = () => {
@@ -39,9 +39,16 @@ const InvoiceDetail = () => {
 
   const downloadReceipt = async () => {
     try {
-      window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/fees/invoice/${id}/receipt`, '_blank')
+      const response = await api.get(`/fees/invoice/${id}/receipt`, { responseType: 'blob' })
+      const url = URL.createObjectURL(response.data)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `receipt-${id}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Failed to download receipt:', error)
+      toast.error(error.response?.data?.error || 'Failed to download receipt')
     }
   }
 

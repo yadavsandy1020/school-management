@@ -107,6 +107,18 @@ const studentSchema = new mongoose.Schema({
     type: Map,
     of: mongoose.Schema.Types.Mixed
   },
+  feeDiscount: {
+    type: {
+      type: String,
+      enum: ['percentage', 'fixed'],
+      default: 'fixed'
+    },
+    amount: {
+      type: Number,
+      default: 0
+    },
+    reason: String
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -122,7 +134,6 @@ const studentSchema = new mongoose.Schema({
 });
 
 // Indexes
-studentSchema.index({ admissionNo: 1 });
 studentSchema.index({ tenantId: 1, schoolId: 1 });
 studentSchema.index({ classId: 1, section: 1 });
 studentSchema.index({ academicSession: 1 });

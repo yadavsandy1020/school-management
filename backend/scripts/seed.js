@@ -1,9 +1,8 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const School = require('../models/School');
 const User = require('../models/User');
-const Class = require('../models/Class');
+const Role = require('../models/Role');
 
 const connectDB = async () => {
   try {
@@ -15,171 +14,64 @@ const connectDB = async () => {
   }
 };
 
+const getOrCreateSystemRole = async (slug, name, permissionCodes) => {
+  let role = await Role.findOne({ slug, tenantId: { $exists: false } });
+  if (!role) {
+    role = await Role.create({ name, slug, isSystem: true, permissionCodes, isActive: true });
+    console.log(`Created system role: ${name}`);
+  }
+  return role;
+};
+
 const seedData = async () => {
   try {
-    // Clear existing data (optional - comment out if you want to preserve data)
-    // await User.deleteMany({});
-    // await School.deleteMany({});
-    // await Class.deleteMany({});
+    // Ensure system roles exist
+    const superAdminRole = await getOrCreateSystemRole('super_admin', 'Super Admin', ['*']);
+    await getOrCreateSystemRole('school_admin', 'School Admin', [
+      'DASHBOARD_VIEW', 'STUDENT_VIEW', 'STUDENT_CREATE', 'STUDENT_UPDATE', 'STUDENT_DELETE',
+      'TEACHER_VIEW', 'TEACHER_CREATE', 'TEACHER_UPDATE', 'TEACHER_DELETE',
+      'CLASS_VIEW', 'CLASS_MANAGE', 'ATTENDANCE_VIEW', 'ATTENDANCE_MARK', 'ATTENDANCE_REPORT',
+      'FEE_STRUCTURE_VIEW', 'FEE_STRUCTURE_MANAGE', 'FEE_INVOICE_VIEW', 'FEE_INVOICE_CREATE',
+      'FEE_PAYMENT_RECORD', 'FINANCE_VIEW', 'FINANCE_MANAGE', 'LIBRARY_VIEW', 'LIBRARY_MANAGE',
+      'TRANSPORT_VIEW', 'TRANSPORT_MANAGE', 'HOSTEL_VIEW', 'HOSTEL_MANAGE',
+      'EMPLOYEE_VIEW', 'EMPLOYEE_MANAGE', 'PAYROLL_MANAGE',
+      'INVENTORY_VIEW', 'INVENTORY_MANAGE',
+      'NOTICE_VIEW', 'NOTICE_CREATE', 'NOTICE_MANAGE', 'REPORT_VIEW', 'REPORT_EXPORT',
+      'SETTINGS_VIEW', 'SETTINGS_MANAGE', 'ROLE_MANAGE', 'USER_MANAGE', 'AUDIT_LOG_VIEW'
+    ]);
+    await getOrCreateSystemRole('teacher', 'Teacher', [
+      'DASHBOARD_VIEW', 'STUDENT_VIEW', 'CLASS_VIEW', 'ATTENDANCE_VIEW', 'ATTENDANCE_MARK',
+      'ATTENDANCE_REPORT', 'NOTICE_VIEW'
+    ]);
+    await getOrCreateSystemRole('student', 'Student', [
+      'DASHBOARD_VIEW', 'CLASS_VIEW', 'ATTENDANCE_VIEW', 'NOTICE_VIEW'
+    ]);
+    await getOrCreateSystemRole('parent', 'Parent', [
+      'DASHBOARD_VIEW', 'STUDENT_VIEW', 'ATTENDANCE_VIEW', 'FEE_INVOICE_VIEW', 'NOTICE_VIEW'
+    ]);
 
-    // Check if super admin exists
+    // Create super admin if not exists
     const superAdminExists = await User.findOne({ role: 'super_admin' });
-    
+
     if (!superAdminExists) {
       console.log('Creating Super Admin...');
       const superAdmin = await User.create({
         name: 'Super Admin',
         email: process.env.SUPER_ADMIN_EMAIL || 'admin@schoolsaas.com',
         password: process.env.SUPER_ADMIN_PASSWORD || 'admin123456',
-        role: 'super_admin'
+        role: 'super_admin',
+        roleId: superAdminRole._id
       });
       console.log('Super Admin created:', superAdmin.email);
     } else {
       console.log('Super Admin already exists');
     }
 
-    // Create demo school
-    const demoSchoolExists = await School.findOne({ name: 'Demo School' });
-    
-    if (!demoSchoolExists) {
-      console.log('Creating Demo School...');
-      const demoSchool = await School.create({
-        tenantId: 'demo-school-123456',
-        name: 'Demo School',
-        subdomain: 'demoschool',
-        address: {
-          street: '123 Main Street',
-          city: 'Shikohabad',
-          state: 'Uttar Pradesh',
-          pincode: '283203',
-          country: 'India'
-        },
-        contact: {
-          phone: '+91-9876543210',
-          email: 'info@demoschool.com',
-          website: 'www.demoschool.com'
-        },
-        academicConfig: {
-          currentSession: '2024-25',
-          sessionStartMonth: 'April'
-        },
-        subscription: {
-          plan: 'premium',
-          startDate: new Date(),
-          endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-          isActive: true
-        },
-        enabledModules: {
-          students: true,
-          teachers: true,
-          attendance: true,
-          fees: true,
-          notices: true,
-          reports: true,
-          admissions: true,
-          timetable: true,
-          exams: false,
-          library: false,
-          transport: false,
-          hostel: false
-        }
-      });
-
-      console.log('Demo School created:', demoSchool.tenantId);
-
-      // Create school admin
-      const schoolAdmin = await User.create({
-        name: 'School Admin',
-        email: 'schooladmin@demoschool.com',
-        password: 'admin123',
-        role: 'school_admin',
-        tenantId: demoSchool.tenantId,
-        schoolId: demoSchool._id
-      });
-      console.log('School Admin created:', schoolAdmin.email);
-
-      // Create demo classes
-      const classes = [
-        { name: 'Class 1', sections: ['A', 'B'] },
-        { name: 'Class 2', sections: ['A', 'B'] },
-        { name: 'Class 3', sections: ['A', 'B'] },
-        { name: 'Class 4', sections: ['A'] },
-        { name: 'Class 5', sections: ['A'] }
-      ];
-
-      for (const classData of classes) {
-        const newClass = await Class.create({
-          name: classData.name,
-          sections: classData.sections,
-          tenantId: demoSchool.tenantId,
-          schoolId: demoSchool._id,
-          capacity: 40
-        });
-        console.log(`Created ${classData.name} with sections: ${classData.sections.join(', ')}`);
-      }
-
-      // Create demo teacher
-      const teacher = await User.create({
-        name: 'Demo Teacher',
-        email: 'teacher@demoschool.com',
-        password: 'teacher123',
-        role: 'teacher',
-        tenantId: demoSchool.tenantId,
-        schoolId: demoSchool._id,
-        phone: '+91-9876543211'
-      });
-      console.log('Demo Teacher created:', teacher.email);
-
-      // Create demo student
-      const Student = require('../models/Student');
-      const class1 = await Class.findOne({ name: 'Class 1', schoolId: demoSchool._id });
-      
-      const student = await Student.create({
-        admissionNo: 'STD-2024-001',
-        tenantId: demoSchool.tenantId,
-        schoolId: demoSchool._id,
-        classId: class1._id,
-        section: 'A',
-        academicSession: '2024-25',
-        personalInfo: {
-          firstName: 'Rahul',
-          lastName: 'Sharma',
-          dateOfBirth: new Date('2015-05-15'),
-          gender: 'male'
-        },
-        contactInfo: {
-          phone: '+91-9876543212',
-          address: {
-            street: '456 Colony',
-            city: 'Shikohabad',
-            state: 'Uttar Pradesh',
-            pincode: '283203'
-          }
-        },
-        parentInfo: {
-          fatherName: 'Rajesh Sharma',
-          fatherPhone: '+91-9876543213',
-          fatherOccupation: 'Business'
-        }
-      });
-      console.log('Demo Student created:', student.admissionNo);
-
-      console.log('\n=== Demo Data Created Successfully ===');
-      console.log('Super Admin Login:');
-      console.log('  Email:', process.env.SUPER_ADMIN_EMAIL || 'admin@schoolsaas.com');
-      console.log('  Password:', process.env.SUPER_ADMIN_PASSWORD || 'admin123456');
-      console.log('\nSchool Admin Login:');
-      console.log('  Email: schooladmin@demoschool.com');
-      console.log('  Password: admin123');
-      console.log('  Tenant ID:', demoSchool.tenantId);
-      console.log('\nTeacher Login:');
-      console.log('  Email: teacher@demoschool.com');
-      console.log('  Password: teacher123');
-      console.log('  Tenant ID:', demoSchool.tenantId);
-      
-    } else {
-      console.log('Demo School already exists');
-    }
+    console.log('\n=== Seed Complete ===');
+    console.log('Super Admin Login:');
+    console.log('  Email:', process.env.SUPER_ADMIN_EMAIL || 'admin@schoolsaas.com');
+    console.log('  Password:', process.env.SUPER_ADMIN_PASSWORD || 'admin123456');
+    console.log('\nUse the onboarding flow to create schools.');
 
     process.exit(0);
   } catch (error) {

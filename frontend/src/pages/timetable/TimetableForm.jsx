@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../../utils/api'
 import toast from 'react-hot-toast'
-import { Plus, Trash2, Clock } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 
 const TimetableForm = () => {
   const navigate = useNavigate()

@@ -22,14 +22,16 @@ export const AuthProvider = ({ children }) => {
     setLoading(false)
   }
 
-  const login = async (email, password, tenantId) => {
+  const login = async (email, password) => {
     try {
-      const response = await api.post('/auth/login', { email, password, tenantId })
-      const { token, user: userData } = response.data
+      const response = await api.post('/auth/login', { email, password })
+      const { token, refreshToken, user: userData } = response.data
 
       localStorage.setItem('token', token)
+      localStorage.setItem('refreshToken', refreshToken)
       localStorage.setItem('user', JSON.stringify(userData))
-      localStorage.setItem('tenantId', userData.tenantId)
+      if (userData.tenantId) localStorage.setItem('tenantId', userData.tenantId)
+      if (userData.schoolId) localStorage.setItem('schoolId', userData.schoolId)
 
       setUser(userData)
       toast.success('Login successful')
@@ -47,7 +49,8 @@ export const AuthProvider = ({ children }) => {
 
       localStorage.setItem('token', token)
       localStorage.setItem('user', JSON.stringify(newUser))
-      localStorage.setItem('tenantId', newUser.tenantId)
+      if (newUser.tenantId) localStorage.setItem('tenantId', newUser.tenantId)
+      if (newUser.schoolId) localStorage.setItem('schoolId', newUser.schoolId)
 
       setUser(newUser)
       toast.success('Registration successful')
@@ -58,13 +61,33 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  const logout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    localStorage.removeItem('tenantId')
-    setUser(null)
-    toast.success('Logged out successfully')
-    window.location.href = '/login'
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch (error) {
+      console.error('Failed to revoke the current session:', error)
+    } finally {
+      localStorage.removeItem('token')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('tenantId')
+      localStorage.removeItem('schoolId')
+      setUser(null)
+      toast.success('Logged out successfully')
+      window.location.href = '/login'
+    }
+  }
+
+  const hasPermission = (permission) => {
+    if (!user) return false
+    if (user.role === 'super_admin' || user.role === 'organization_owner') return true
+    const permissions = user.permissions || []
+    return permissions.includes('*') || permissions.includes(permission)
+  }
+
+  const hasRole = (...roles) => {
+    if (!user) return false
+    return roles.includes(user.role) || user.role === 'super_admin'
   }
 
   const value = {
@@ -73,6 +96,8 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    hasPermission,
+    hasRole
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

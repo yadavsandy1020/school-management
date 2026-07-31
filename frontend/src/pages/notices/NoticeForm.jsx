@@ -42,7 +42,7 @@ const NoticeForm = () => {
       }
       navigate('/notices')
     } catch (error) {
-      toast.error('Failed to save notice')
+      toast.error(error.response?.data?.error || 'Failed to save notice')
     } finally {
       setLoading(false)
     }

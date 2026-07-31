@@ -29,6 +29,15 @@ const feeInvoiceSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  quarter: {
+    type: String,
+    enum: ['Q1', 'Q2', 'Q3', 'Q4'],
+    default: null
+  },
+  installmentLabel: {
+    type: String,
+    default: null
+  },
   feeStructureId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'FeeStructure'
@@ -123,7 +132,6 @@ const feeInvoiceSchema = new mongoose.Schema({
 });
 
 // Indexes
-feeInvoiceSchema.index({ invoiceNo: 1 });
 feeInvoiceSchema.index({ tenantId: 1, schoolId: 1 });
 feeInvoiceSchema.index({ studentId: 1, academicSession: 1 });
 feeInvoiceSchema.index({ status: 1, dueDate: 1 });

@@ -1,5 +1,8 @@
 const Attendance = require('../models/Attendance');
+const TeacherAttendance = require('../models/TeacherAttendance');
+const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
+const CalendarEvent = require('../models/CalendarEvent');
 const { buildPaginationResponse } = require('../middleware/pagination');
 
 // @desc    Mark attendance for a class
@@ -65,7 +68,7 @@ exports.markAttendance = async (req, res) => {
 // @access  Private (Teacher, School Admin)
 exports.updateAttendance = async (req, res) => {
   try {
-    let attendance = await Attendance.findById(req.params.id);
+    let attendance = await Attendance.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!attendance) {
       return res.status(404).json({
@@ -154,7 +157,7 @@ exports.getAttendance = async (req, res) => {
 // @access  Private
 exports.getAttendanceById = async (req, res) => {
   try {
-    const attendance = await Attendance.findById(req.params.id)
+    const attendance = await Attendance.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId })
       .populate('classId', 'name sections')
       .populate('records.studentId', 'admissionNo personalInfo.firstName personalInfo.lastName')
       .populate('markedBy', 'name');
@@ -194,6 +197,13 @@ exports.getStudentAttendance = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     const studentId = req.params.studentId;
+
+    if (req.user.role === 'parent') {
+      if (studentId !== req.user.studentId.toString()) {
+        return res.status(403).json({ success: false, error: 'Not authorized to access this student attendance' });
+      }
+    }
+
     const filter = { tenantId: req.user.tenantId, 'records.studentId': studentId };
 
     if (startDate && endDate) {
@@ -224,7 +234,15 @@ exports.getStudentAttendance = async (req, res) => {
         absentDays,
         percentage: parseFloat(percentage)
       },
-      attendance
+      attendance: attendance.map((entry) => {
+        const record = entry.records.find((item) => item.studentId.toString() === studentId);
+        return {
+          _id: entry._id,
+          date: entry.date,
+          status: record?.status || 'not_marked',
+          remarks: record?.remarks
+        };
+      })
     });
   } catch (error) {
     console.error(error);
@@ -242,10 +260,10 @@ exports.getClassAttendanceReport = async (req, res) => {
   try {
     const { section, startDate, endDate } = req.query;
     const classId = req.params.classId;
-    const filter = { 
-      tenantId: req.user.tenantId, 
+    const filter = {
+      tenantId: req.user.tenantId,
       schoolId: req.user.schoolId,
-      classId 
+      classId
     };
 
     if (section) filter.section = section;
@@ -258,11 +276,11 @@ exports.getClassAttendanceReport = async (req, res) => {
       .sort({ date: -1 });
 
     // Get all students in the class
-    const students = await Student.find({ 
-      classId, 
-      section, 
+    const students = await Student.find({
+      classId,
+      section,
       tenantId: req.user.tenantId,
-      isActive: true 
+      isActive: true
     });
 
     // Build report
@@ -314,7 +332,7 @@ exports.getClassAttendanceReport = async (req, res) => {
 // @access  Private (School Admin only)
 exports.deleteAttendance = async (req, res) => {
   try {
-    const attendance = await Attendance.findById(req.params.id);
+    const attendance = await Attendance.findOne({ _id: req.params.id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
 
     if (!attendance) {
       return res.status(404).json({
@@ -331,7 +349,7 @@ exports.deleteAttendance = async (req, res) => {
       });
     }
 
-    await attendance.remove();
+    await attendance.deleteOne();
 
     res.status(200).json({
       success: true,
@@ -343,5 +361,221 @@ exports.deleteAttendance = async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+};
+
+// @desc    Teacher marks own attendance
+// @route   POST /api/attendance/self
+// @access  Private (Teacher)
+exports.markSelfAttendance = async (req, res) => {
+  try {
+    const { date, status, remarks } = req.body;
+    const attDate = new Date(date || Date.now());
+    attDate.setHours(0, 0, 0, 0);
+
+    const teacher = await Teacher.findOne({ userId: req.user._id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
+    if (!teacher) {
+      return res.status(404).json({ success: false, error: 'Teacher profile not found' });
+    }
+
+    const existing = await TeacherAttendance.findOne({
+      date: attDate,
+      teacherId: teacher._id,
+      tenantId: req.user.tenantId
+    });
+
+    if (existing) {
+      return res.status(400).json({ success: false, error: 'Attendance already marked for today. Use update to change.' });
+    }
+
+    const attendance = await TeacherAttendance.create({
+      date: attDate,
+      tenantId: req.user.tenantId,
+      schoolId: req.user.schoolId,
+      teacherId: teacher._id,
+      userId: req.user._id,
+      status,
+      remarks,
+      markedBy: req.user._id
+    });
+
+    res.status(201).json({ success: true, attendance });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// @desc    Get teacher's own attendance
+// @route   GET /api/attendance/self
+// @access  Private (Teacher)
+exports.getSelfAttendance = async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const teacher = await Teacher.findOne({ userId: req.user._id, tenantId: req.user.tenantId, schoolId: req.user.schoolId });
+    if (!teacher) {
+      return res.status(404).json({ success: false, error: 'Teacher profile not found' });
+    }
+
+    const filter = {
+      teacherId: teacher._id,
+      tenantId: req.user.tenantId,
+      schoolId: req.user.schoolId
+    };
+
+    const targetYear = year ? Number(year) : new Date().getFullYear();
+    const targetMonth = month ? Number(month) - 1 : new Date().getMonth();
+    const start = new Date(targetYear, targetMonth, 1);
+    const end = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
+    filter.date = { $gte: start, $lte: end };
+
+    const records = await TeacherAttendance.find(filter).sort({ date: 1 });
+
+    const totalDays = records.length;
+    const presentDays = records.filter(r => r.status === 'present').length;
+    const halfDays = records.filter(r => r.status === 'half_day').length;
+    const absentDays = records.filter(r => r.status === 'absent').length;
+    const percentage = totalDays > 0 ? (((presentDays + halfDays * 0.5) / totalDays) * 100).toFixed(2) : 0;
+
+    res.status(200).json({
+      success: true,
+      statistics: { totalDays, presentDays, absentDays, halfDays, percentage: parseFloat(percentage) },
+      data: records
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// @desc    Get all teacher attendance (admin view)
+// @route   GET /api/attendance/teachers
+// @access  Private (School Admin)
+exports.getAllTeacherAttendance = async (req, res) => {
+  try {
+    const { date, startDate, endDate } = req.query;
+    const filter = { tenantId: req.user.tenantId, schoolId: req.user.schoolId };
+
+    if (date) {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      filter.date = d;
+    } else if (startDate && endDate) {
+      filter.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    }
+
+    const records = await TeacherAttendance.find(filter)
+      .populate('teacherId', 'personalInfo employeeId')
+      .sort({ date: -1 });
+
+    res.status(200).json({ success: true, count: records.length, data: records });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// @desc    Get student attendance with holiday exclusion
+// @route   GET /api/attendance/student/:studentId/summary
+// @access  Private
+exports.getStudentAttendanceSummary = async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const studentId = req.params.studentId;
+
+    if (req.user.role === 'parent') {
+      if (studentId !== req.user.studentId.toString()) {
+        return res.status(403).json({ success: false, error: 'Not authorized' });
+      }
+    }
+
+    const targetYear = year ? Number(year) : new Date().getFullYear();
+    const targetMonth = month ? Number(month) - 1 : new Date().getMonth();
+    const start = new Date(targetYear, targetMonth, 1);
+    const end = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
+
+    // Get holidays in the month
+    const holidays = await CalendarEvent.find({
+      tenantId: req.user.tenantId,
+      schoolId: req.user.schoolId,
+      type: 'holiday',
+      startDate: { $lte: end },
+      endDate: { $gte: start }
+    });
+
+    const holidayDates = new Set();
+    holidays.forEach(h => {
+      const hStart = new Date(h.startDate);
+      const hEnd = new Date(h.endDate);
+      for (let d = new Date(hStart); d <= hEnd; d.setDate(d.getDate() + 1)) {
+        if (d >= start && d <= end) {
+          holidayDates.add(new Date(d).setHours(0, 0, 0, 0));
+        }
+      }
+    });
+
+    const attendance = await Attendance.find({
+      tenantId: req.user.tenantId,
+      'records.studentId': studentId,
+      date: { $gte: start, $lte: end }
+    }).sort({ date: 1 });
+
+    // Calculate working days excluding holidays and weekends
+    const workingDays = [];
+    const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+    for (let i = 1; i <= daysInMonth; i++) {
+      const d = new Date(targetYear, targetMonth, i);
+      d.setHours(0, 0, 0, 0);
+      const dayOfWeek = d.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidayDates.has(d.getTime())) {
+        workingDays.push(d);
+      }
+    }
+
+    const totalWorkingDays = workingDays.length;
+    let presentDays = 0;
+    let absentDays = 0;
+    let markedDays = 0;
+
+    const calendar = workingDays.map(wd => {
+      const att = attendance.find(a => {
+        const aDate = new Date(a.date);
+        aDate.setHours(0, 0, 0, 0);
+        return aDate.getTime() === wd.getTime();
+      });
+      const record = att?.records.find(r => r.studentId.toString() === studentId);
+      if (record) {
+        markedDays++;
+        if (record.status === 'present' || record.status === 'late') presentDays++;
+        else if (record.status === 'absent') absentDays++;
+      }
+      return {
+        date: wd,
+        status: record?.status || 'not_marked',
+        isHoliday: false
+      };
+    });
+
+    // Add holidays to calendar
+    const holidayEntries = Array.from(holidayDates).map(ts => ({
+      date: new Date(ts),
+      status: 'holiday',
+      isHoliday: true
+    }));
+
+    const fullCalendar = [...calendar, ...holidayEntries].sort((a, b) => a.date - b.date);
+    const percentage = totalWorkingDays > 0 ? ((presentDays / totalWorkingDays) * 100).toFixed(2) : 0;
+
+    res.status(200).json({
+      success: true,
+      statistics: {
+        totalWorkingDays,
+        markedDays,
+        presentDays,
+        absentDays,
+        holidays: holidayDates.size,
+        percentage: parseFloat(percentage)
+      },
+      calendar: fullCalendar
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 };

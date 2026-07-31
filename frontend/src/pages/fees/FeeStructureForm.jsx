@@ -8,6 +8,7 @@ const FeeStructureForm = () => {
   const { id } = useParams()
   const isEdit = !!id
   const [loading, setLoading] = useState(false)
+  const [classes, setClasses] = useState([])
   const [formData, setFormData] = useState({
     name: '',
     classId: '',
@@ -16,13 +17,27 @@ const FeeStructureForm = () => {
   })
 
   useEffect(() => {
+    fetchClasses()
     if (isEdit) fetchStructure()
   }, [id])
+
+  const fetchClasses = async () => {
+    try {
+      const response = await api.get('/classes?limit=100')
+      setClasses(response.data.data || [])
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to load classes')
+    }
+  }
 
   const fetchStructure = async () => {
     try {
       const response = await api.get(`/fees/structure/${id}`)
-      setFormData(response.data.feeStructure)
+      const feeStructure = response.data.feeStructure
+      setFormData({
+        ...feeStructure,
+        classId: feeStructure.classId?._id || feeStructure.classId || ''
+      })
     } catch (error) {
       console.error('Failed to fetch fee structure:', error)
     }
@@ -55,7 +70,7 @@ const FeeStructureForm = () => {
       }
       navigate('/fees/structure')
     } catch (error) {
-      toast.error('Failed to save fee structure')
+      toast.error(error.response?.data?.error || 'Failed to save fee structure')
     } finally {
       setLoading(false)
     }
@@ -72,6 +87,15 @@ const FeeStructureForm = () => {
           <div>
             <label className="label">Name *</label>
             <input type="text" name="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="input" required />
+          </div>
+          <div>
+            <label className="label">Class *</label>
+            <select name="classId" value={formData.classId} onChange={(e) => setFormData({ ...formData, classId: e.target.value })} className="input" required>
+              <option value="">Select a class</option>
+              {classes.map((classItem) => (
+                <option key={classItem._id} value={classItem._id}>{classItem.name}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="label">Academic Session *</label>

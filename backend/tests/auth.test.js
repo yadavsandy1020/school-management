@@ -6,16 +6,24 @@ const User = require('../models/User');
 describe('Auth API Tests', () => {
   let token;
   let userId;
+  let schoolId;
+  let tenantId;
 
   beforeAll(async () => {
     // Connect to test database
     await mongoose.connect(process.env.MONGODB_URI_TEST || process.env.MONGODB_URI);
+    // Use existing demo school for tests
+    const School = require('../models/School');
+    const school = await School.findOne().lean();
+    if (school) {
+      schoolId = school._id.toString();
+      tenantId = school.tenantId;
+    }
   });
 
   afterAll(async () => {
     // Clean up test data
     await User.deleteMany({ email: { $regex: 'test' } });
-    await mongoose.connection.close();
   });
 
   describe('POST /api/auth/register', () => {
@@ -27,8 +35,8 @@ describe('Auth API Tests', () => {
           email: 'test@example.com',
           password: 'test123456',
           role: 'school_admin',
-          tenantId: 'test-tenant-123',
-          schoolId: '507f1f77bcf86cd799439011'
+          tenantId: tenantId || 'test-tenant-123',
+          schoolId: schoolId || '507f1f77bcf86cd799439011'
         });
 
       expect(res.statusCode).toEqual(201);
@@ -73,7 +81,7 @@ describe('Auth API Tests', () => {
         .send({
           email: 'test@example.com',
           password: 'test123456',
-          tenantId: 'test-tenant-123'
+          tenantId: tenantId || 'test-tenant-123'
         });
 
       expect(res.statusCode).toEqual(200);
@@ -144,24 +152,30 @@ describe('Auth API Tests', () => {
 describe('Student API Tests', () => {
   let token;
   let studentId;
+  let classId;
 
   beforeAll(async () => {
-    // Login as school admin
+    // Login as demo school admin
     const res = await request(app)
       .post('/api/auth/login')
       .send({
-        email: 'schooladmin@demoschool.com',
-        password: 'admin123',
-        tenantId: 'demo-school-123456'
+        email: 'schooladmin@rigveda.com',
+        password: 'admin123'
       });
     token = res.body.token;
+
+    // Fetch an existing class for the school
+    const Class = require('../models/Class');
+    const cls = await Class.findOne({ tenantId: '1' }).select('_id').lean();
+    if (cls) classId = cls._id.toString();
   });
 
   describe('GET /api/students', () => {
     it('should get all students with valid token', async () => {
       const res = await request(app)
         .get('/api/students')
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${token}`)
+        .set('x-tenant-id', '1');
 
       expect(res.statusCode).toEqual(200);
       expect(res.body).toHaveProperty('success', true);
@@ -178,27 +192,38 @@ describe('Student API Tests', () => {
 
   describe('POST /api/students', () => {
     it('should create a new student with valid data', async () => {
+      if (!classId) return;
       const res = await request(app)
         .post('/api/students')
         .set('Authorization', `Bearer ${token}`)
+        .set('x-tenant-id', '1')
         .send({
           admissionNo: 'TEST-001',
-          firstName: 'Test',
-          lastName: 'Student',
-          classId: '507f1f77bcf86cd799439011',
+          classId,
           section: 'A',
-          academicYear: '2024-25'
+          academicSession: '2024-25',
+          personalInfo: {
+            firstName: 'Test',
+            lastName: 'Student',
+            dateOfBirth: '2015-01-01',
+            gender: 'male'
+          },
+          parentInfo: {
+            fatherName: 'Test Father',
+            fatherPhone: '+91-9876543210'
+          }
         });
 
       expect(res.statusCode).toEqual(201);
       expect(res.body).toHaveProperty('success', true);
-      studentId = res.body.data._id;
+      studentId = res.body.student._id;
     });
 
     it('should fail with invalid data', async () => {
       const res = await request(app)
         .post('/api/students')
         .set('Authorization', `Bearer ${token}`)
+        .set('x-tenant-id', '1')
         .send({
           admissionNo: 'TEST-002',
           firstName: 'Test'
@@ -208,4 +233,16 @@ describe('Student API Tests', () => {
       expect(res.statusCode).toEqual(400);
     });
   });
+
+  afterAll(async () => {
+    if (studentId) {
+      const Student = require('../models/Student');
+      await Student.deleteOne({ _id: studentId });
+    }
+    await User.deleteMany({ email: { $regex: 'test' } });
+  });
+});
+
+afterAll(async () => {
+  await mongoose.connection.close();
 });

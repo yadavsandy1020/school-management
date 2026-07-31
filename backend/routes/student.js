@@ -3,6 +3,7 @@ const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 const { paginate } = require('../middleware/pagination');
 const { validate, studentSchema } = require('../middleware/validator');
+const { requireActiveLicense, requireFeature, checkStudentLimit, requireWriteAccess } = require('../middleware/saas');
 const {
   createStudent,
   getStudents,
@@ -11,24 +12,28 @@ const {
   deleteStudent,
   linkParent,
   bulkImportStudents,
-  getStudentByAdmissionNo
+  getStudentByAdmissionNo,
+  getStudentProfile
 } = require('../controllers/studentController');
 
 router.use(paginate);
+router.use(protect, requireActiveLicense, requireFeature('STUDENTS'));
 
 router.route('/')
-  .post(protect, authorize('school_admin'), validate(studentSchema), createStudent)
-  .get(protect, getStudents);
+  .post(authorize('school_admin'), checkStudentLimit(1), validate(studentSchema), createStudent)
+  .get(authorize('school_admin', 'teacher', 'super_admin'), getStudents);
 
-router.post('/bulk', protect, authorize('school_admin'), bulkImportStudents);
+router.post('/bulk', authorize('school_admin'), checkStudentLimit(req => req.body.students?.length || 1), bulkImportStudents);
+
+router.get('/profile', authorize('student'), getStudentProfile);
 
 router.route('/:id')
-  .get(protect, getStudent)
-  .put(protect, authorize('school_admin'), validate(studentSchema), updateStudent)
-  .delete(protect, authorize('school_admin'), deleteStudent);
+  .get(authorize('school_admin', 'teacher', 'super_admin'), getStudent)
+  .put(authorize('school_admin'), requireWriteAccess, validate(studentSchema), updateStudent)
+  .delete(authorize('school_admin'), requireWriteAccess, deleteStudent);
 
-router.put('/:id/link-parent', protect, authorize('school_admin'), linkParent);
+router.put('/:id/link-parent', authorize('school_admin'), requireWriteAccess, linkParent);
 
-router.get('/admission/:admissionNo', protect, getStudentByAdmissionNo);
+router.get('/admission/:admissionNo', authorize('school_admin', 'teacher', 'super_admin'), getStudentByAdmissionNo);
 
 module.exports = router;

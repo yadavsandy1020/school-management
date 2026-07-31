@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 const { paginate } = require('../middleware/pagination');
+const { requireActiveLicense, requireFeature, requireWriteAccess } = require('../middleware/saas');
 const {
   createClass,
   getClasses,
@@ -14,18 +15,19 @@ const {
 } = require('../controllers/classController');
 
 router.use(paginate);
+router.use(protect, requireActiveLicense, requireFeature('ACADEMIC'));
 
 router.route('/')
-  .post(protect, authorize('school_admin'), createClass)
-  .get(protect, getClasses);
+  .post(authorize('school_admin'), requireWriteAccess, createClass)
+  .get(getClasses);
 
-router.post('/:id/sections', protect, authorize('school_admin'), addSection);
-router.delete('/:id/sections/:section', protect, authorize('school_admin'), removeSection);
-router.put('/:id/subjects', protect, authorize('school_admin'), assignSubjects);
+router.post('/:id/sections', authorize('school_admin'), requireWriteAccess, addSection);
+router.delete('/:id/sections/:section', authorize('school_admin'), requireWriteAccess, removeSection);
+router.put('/:id/subjects', authorize('school_admin'), requireWriteAccess, assignSubjects);
 
 router.route('/:id')
-  .get(protect, getClass)
-  .put(protect, authorize('school_admin'), updateClass)
-  .delete(protect, authorize('school_admin'), deleteClass);
+  .get(getClass)
+  .put(authorize('school_admin'), requireWriteAccess, updateClass)
+  .delete(authorize('school_admin'), requireWriteAccess, deleteClass);
 
 module.exports = router;

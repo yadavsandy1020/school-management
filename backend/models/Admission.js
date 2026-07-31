@@ -24,6 +24,10 @@ const admissionSchema = new mongoose.Schema({
     ref: 'Class',
     required: true
   },
+  section: {
+    type: String,
+    default: 'A'
+  },
   status: {
     type: String,
     enum: ['pending', 'under_review', 'approved', 'rejected', 'enrolled'],
@@ -115,13 +119,24 @@ const admissionSchema = new mongoose.Schema({
   customFields: {
     type: Map,
     of: mongoose.Schema.Types.Mixed
+  },
+  feeDiscount: {
+    type: {
+      type: String,
+      enum: ['percentage', 'fixed'],
+      default: 'fixed'
+    },
+    amount: {
+      type: Number,
+      default: 0
+    },
+    reason: String
   }
 }, {
   timestamps: true
 });
 
 // Indexes
-admissionSchema.index({ applicationNo: 1 });
 admissionSchema.index({ tenantId: 1, schoolId: 1 });
 admissionSchema.index({ status: 1, academicSession: 1 });
 

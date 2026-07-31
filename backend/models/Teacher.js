@@ -129,7 +129,6 @@ const teacherSchema = new mongoose.Schema({
 });
 
 // Indexes
-teacherSchema.index({ employeeId: 1 });
 teacherSchema.index({ tenantId: 1, schoolId: 1 });
 teacherSchema.index({ schoolId: 1, isActive: 1 });
 

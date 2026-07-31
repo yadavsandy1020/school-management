@@ -4,6 +4,10 @@ const Attendance = require('../models/Attendance');
 const FeeInvoice = require('../models/FeeInvoice');
 const Class = require('../models/Class');
 const Notice = require('../models/Notice');
+const TeacherSalaryPayment = require('../models/TeacherSalaryPayment');
+const SchoolExpense = require('../models/SchoolExpense');
+const MarksEntry = require('../models/MarksEntry');
+const Exam = require('../models/Exam');
 
 // @desc    Get dashboard statistics
 // @route   GET /api/reports/dashboard
@@ -25,6 +29,14 @@ exports.getDashboardStats = async (req, res) => {
     const collectedFees = feeInvoices.reduce((sum, inv) => sum + inv.paidAmount, 0);
     const pendingFees = totalFees - collectedFees;
 
+    // Get salary & expense totals
+    const salaryPayments = await TeacherSalaryPayment.find({ tenantId, schoolId });
+    const totalSalaryPaid = salaryPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const activeTeachers = await Teacher.find({ tenantId, schoolId, isActive: true });
+    const totalMonthlySalary = activeTeachers.reduce((sum, teacher) => sum + (teacher.salaryDetails?.totalSalary || 0), 0);
+    const expenses = await SchoolExpense.find({ tenantId, schoolId });
+    const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+
     // Get today's attendance
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -38,7 +50,7 @@ exports.getDashboardStats = async (req, res) => {
       total: todayAttendance.totalStudents,
       present: todayAttendance.presentCount,
       absent: todayAttendance.absentCount,
-      percentage: todayAttendance.totalStudents > 0 
+      percentage: todayAttendance.totalStudents > 0
         ? ((todayAttendance.presentCount / todayAttendance.totalStudents) * 100).toFixed(2)
         : 0
     } : { total: 0, present: 0, absent: 0, percentage: 0 };
@@ -55,6 +67,15 @@ exports.getDashboardStats = async (req, res) => {
           collected: collectedFees,
           pending: pendingFees,
           collectionRate: totalFees > 0 ? ((collectedFees / totalFees) * 100).toFixed(2) : 0
+        },
+        finances: {
+          salaries: {
+            totalPayable: totalMonthlySalary,
+            paid: totalSalaryPaid,
+            due: totalMonthlySalary - totalSalaryPaid
+          },
+          expenses: totalExpenses,
+          net: collectedFees - totalSalaryPaid - totalExpenses
         },
         attendance: attendanceStats
       }
@@ -166,10 +187,10 @@ exports.getFeeReport = async (req, res) => {
 // @access  Private
 exports.getStrengthReport = async (req, res) => {
   try {
-    const classes = await Class.find({ 
-      tenantId: req.user.tenantId, 
-      schoolId: req.user.schoolId, 
-      isActive: true 
+    const classes = await Class.find({
+      tenantId: req.user.tenantId,
+      schoolId: req.user.schoolId,
+      isActive: true
     }).sort({ name: 1 });
 
     const report = await Promise.all(classes.map(async (cls) => {
@@ -228,10 +249,10 @@ exports.exportReport = async (req, res) => {
 
     switch (type) {
       case 'students':
-        const studentFilter = { 
-          tenantId: req.user.tenantId, 
-          schoolId: req.user.schoolId, 
-          isActive: true 
+        const studentFilter = {
+          tenantId: req.user.tenantId,
+          schoolId: req.user.schoolId,
+          isActive: true
         };
         if (classId) studentFilter.classId = classId;
 
@@ -244,10 +265,10 @@ exports.exportReport = async (req, res) => {
         break;
 
       case 'teachers':
-        data = await Teacher.find({ 
-          tenantId: req.user.tenantId, 
-          schoolId: req.user.schoolId, 
-          isActive: true 
+        data = await Teacher.find({
+          tenantId: req.user.tenantId,
+          schoolId: req.user.schoolId,
+          isActive: true
         }).sort({ 'personalInfo.firstName': 1 });
 
         headers = ['Employee ID', 'Name', 'Designation', 'Phone', 'Email'];
@@ -315,5 +336,100 @@ exports.exportReport = async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+};
+
+exports.getTrendsReport = async (req, res) => {
+  try {
+    const { year } = req.query;
+    const filter = { tenantId: req.user.tenantId, schoolId: req.user.schoolId };
+    const targetYear = year ? Number(year) : new Date().getFullYear();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const feeTrend = await Promise.all(months.map(async (_, index) => {
+      const start = new Date(targetYear, index, 1);
+      const end = new Date(targetYear, index + 1, 0, 23, 59, 59);
+      const invoices = await FeeInvoice.find({ ...filter, createdAt: { $gte: start, $lte: end } });
+      return invoices.reduce((sum, inv) => sum + inv.paidAmount, 0);
+    }));
+
+    const expenseTrend = await Promise.all(months.map(async (_, index) => {
+      const start = new Date(targetYear, index, 1);
+      const end = new Date(targetYear, index + 1, 0, 23, 59, 59);
+      const expenses = await SchoolExpense.find({ ...filter, date: { $gte: start, $lte: end } });
+      return expenses.reduce((sum, ex) => sum + ex.amount, 0);
+    }));
+
+    const attendanceTrend = await Promise.all(months.map(async (_, index) => {
+      const start = new Date(targetYear, index, 1);
+      const end = new Date(targetYear, index + 1, 0, 23, 59, 59);
+      const records = await Attendance.find({ ...filter, date: { $gte: start, $lte: end } });
+      const total = records.reduce((sum, r) => sum + r.totalStudents, 0);
+      const present = records.reduce((sum, r) => sum + r.presentCount, 0);
+      return total > 0 ? parseFloat(((present / total) * 100).toFixed(2)) : 0;
+    }));
+
+    res.status(200).json({ success: true, data: { months, feeTrend, expenseTrend, attendanceTrend } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getExamReport = async (req, res) => {
+  try {
+    const { examId } = req.query;
+    const filter = { tenantId: req.user.tenantId, schoolId: req.user.schoolId, examId };
+    const marks = await MarksEntry.find(filter).populate('studentId', 'name').populate('subjectId', 'name');
+
+    const studentTotals = {};
+    for (const m of marks) {
+      const sid = m.studentId?._id?.toString();
+      if (!sid) continue;
+      if (!studentTotals[sid]) studentTotals[sid] = { name: m.studentId.name, obtained: 0, max: 0 };
+      studentTotals[sid].obtained += m.marksObtained;
+      studentTotals[sid].max += m.maxMarks;
+    }
+
+    const results = Object.values(studentTotals).map(s => ({
+      ...s,
+      percentage: s.max > 0 ? ((s.obtained / s.max) * 100).toFixed(2) : 0
+    })).sort((a, b) => b.percentage - a.percentage);
+
+    const subjectAverages = {};
+    for (const m of marks) {
+      const sub = m.subjectId?.name || 'Unknown';
+      if (!subjectAverages[sub]) subjectAverages[sub] = { total: 0, obtained: 0 };
+      subjectAverages[sub].total += m.maxMarks;
+      subjectAverages[sub].obtained += m.marksObtained;
+    }
+    const subjectWise = Object.entries(subjectAverages).map(([subject, vals]) => ({
+      subject,
+      average: vals.total > 0 ? ((vals.obtained / vals.total) * 100).toFixed(2) : 0
+    }));
+
+    res.status(200).json({ success: true, data: { results, subjectWise } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getFinanceReport = async (req, res) => {
+  try {
+    const filter = { tenantId: req.user.tenantId, schoolId: req.user.schoolId };
+    const invoices = await FeeInvoice.find(filter);
+    const feesCollected = invoices.reduce((sum, i) => sum + i.paidAmount, 0);
+    const salaryPaid = (await TeacherSalaryPayment.find(filter)).reduce((sum, p) => sum + p.amount, 0);
+    const expenses = (await SchoolExpense.find(filter)).reduce((sum, e) => sum + e.amount, 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        income: { fees: feesCollected },
+        expenses: { salaries: salaryPaid, operational: expenses, total: salaryPaid + expenses },
+        net: feesCollected - salaryPaid - expenses
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 };

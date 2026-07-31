@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../../utils/api'
-import { Plus, Edit, DollarSign } from 'lucide-react'
+import { Plus, Edit } from 'lucide-react'
 
 const FeeStructureList = () => {
   const [structures, setStructures] = useState([])
